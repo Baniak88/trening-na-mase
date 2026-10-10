@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Trening na masę</title>
+<meta name="description" content="Trening generowany z regeneracji mięśni, 50 ćwiczeń z animacją techniki, progresja ciężaru i postępy.">
+<meta name="theme-color" content="#F0F1EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1012" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trening">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="appbar" id="appbar"><div class="in"><div id="abLeft"></div><div class="ab-right" id="abRight"></div></div><div id="abSub" hidden></div></header>
+<div class="wrap"><main id="view"></main></div>
+<div id="sessBanner" hidden></div>
+
+<div class="rest" id="rest" hidden>
+  <div class="in">
+    <div><div class="lbl" id="restLbl">Przerwa</div><div class="tm" id="restTm">0:00</div></div>
+    <div class="ctl">
+      <button type="button" id="restMinus" aria-label="Skróć o 15 sekund">−15</button>
+      <button type="button" id="restPlus" aria-label="Wydłuż o 15 sekund">+15</button>
+      <button type="button" id="restSkip">Pomiń</button>
+    </div>
+    <div class="nx" id="restNext"></div>
+    <div class="pb"><b id="restPb"></b></div>
+  </div>
+</div>
+
+<div id="sheetRoot"></div>
+<div id="updateBar" hidden><span>Jest nowa wersja aplikacji.</span><button type="button" id="updateBtn">Odśwież</button></div>
+
+<nav class="tabs" aria-label="Sekcje">
+  <div class="in">
+    <button type="button" data-tab="train"><svg viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M3 9.5v5M21 9.5v5M6 12h12"/></svg>Trening</button>
+    <button type="button" data-tab="recovery"><svg viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2"/><path d="M8 9h8l-1 6h-6zM9 15l-1 6M15 15l1 6M8 9l-3 5M16 9l3 5"/></svg>Regeneracja</button>
+    <button type="button" data-tab="atlas"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Ćwiczenia</button>
+    <button type="button" data-tab="progress"><svg viewBox="0 0 24 24"><path d="M4 19h16M5 15l4-4 4 3 6-7"/></svg>Postępy</button>
+  </div>
+</nav>
+<noscript><p style="padding:16px">Aplikacja potrzebuje włączonego JavaScriptu.</p></noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

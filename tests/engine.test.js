@@ -1,0 +1,103 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {EX, canDo} from '../js/data/catalog.js';
+import {recovery, weeklySets, status} from '../js/engine/recovery.js';
+import {generate, alternatives, autoFocus} from '../js/engine/generator.js';
+import {suggestLoad, e1rm, roundLoad} from '../js/engine/progression.js';
+
+const GYM = ['barbell', 'dumbbells', 'bench', 'machines', 'cable', 'pullup', 'dip'];
+const HOME = ['dumbbells', 'bench', 'pullup'];
+const NOW = new Date('2026-10-12T18:00:00Z');
+const hoursAgo = h => new Date(+NOW - h * 36e5).toISOString();
+const wk = (h, ex, extra = {}) => ({id: 'w' + h, date: hoursAgo(h + 1), end: hoursAgo(h), ex, ...extra});
+const sets = (n, kg, reps) => Array.from({length: n}, () => ({kg, reps}));
+
+test('every exercise has a figure, needs and alternatives that exist', () => {
+  for (const [id, ex] of Object.entries(EX)) {
+    assert.ok(ex.fig && ex.fig.A && ex.fig.B, id + ' figure');
+    assert.ok(Array.isArray(ex.needs), id + ' needs');
+    for (const a of ex.alt) assert.ok(EX[a], id + ' alt ' + a);
+  }
+});
+
+test('fresh lifter is fully recovered', () => {
+  const r = recovery([], NOW);
+  for (const m in r) assert.equal(r[m].pct, 100);
+});
+
+test('chest is tired right after a chest day and recovers over 72 h', () => {
+  const day = [wk(2, [{id: 'bench', sets: sets(4, 80, 8)}, {id: 'dbbench', sets: sets(3, 30, 10)}])];
+  const r2 = recovery(day, NOW);
+  assert.ok(r2.chest.pct < 40, 'chest ' + r2.chest.pct);
+  assert.equal(status(r2.chest.pct), 'tired');
+  assert.ok(r2.triceps.pct > r2.chest.pct, 'secondary muscle less tired');
+  assert.equal(r2.quads.pct, 100);
+  const later = recovery(day, new Date(+NOW + 71 * 36e5));
+  assert.ok(later.chest.pct >= 95);
+});
+
+test('weekly sets count secondary muscles as half', () => {
+  const w = weeklySets([wk(10, [{id: 'bench', sets: sets(4, 80, 8)}])], NOW);
+  assert.equal(w.chest, 4);
+  assert.equal(w.triceps, 2);
+});
+
+test('auto focus picks the fresher half', () => {
+  const legDay = [wk(20, [{id: 'squat', sets: sets(4, 100, 6)}, {id: 'rdl', sets: sets(3, 80, 8)}, {id: 'legpress', sets: sets(3, 150, 10)}])];
+  assert.equal(autoFocus(recovery(legDay, NOW)).focus, 'upper');
+  assert.equal(autoFocus(recovery([], NOW)).focus, 'full');
+});
+
+test('generated workout respects equipment, time and recovery', () => {
+  for (const duration of [30, 45, 60, 75]) {
+    const g = generate({workouts: [], equipment: HOME, duration, seed: 7, now: NOW});
+    assert.ok(g.items.length >= 3, duration + ' min: ' + g.items.length);
+    for (const it of g.items) assert.ok(canDo(EX[it.id], HOME), it.id + ' needs ' + EX[it.id].needs);
+    assert.equal(new Set(g.items.map(i => i.id)).size, g.items.length, 'no duplicates');
+    assert.ok(g.estMin <= duration + 6, 'fits time: ' + g.estMin + ' vs ' + duration);
+  }
+  const legDay = [wk(20, [{id: 'squat', sets: sets(4, 100, 6)}, {id: 'rdl', sets: sets(3, 80, 8)}])];
+  const g = generate({workouts: legDay, equipment: GYM, duration: 60, seed: 3, now: NOW});
+  assert.equal(g.focus, 'upper');
+  assert.ok(!g.items.some(i => ['quads', 'hams'].some(m => EX[i.id].m[m] >= 1)), 'no tired legs');
+});
+
+test('same seed gives the same workout, another seed can differ', () => {
+  const a = generate({equipment: GYM, duration: 60, seed: 11, now: NOW});
+  const b = generate({equipment: GYM, duration: 60, seed: 11, now: NOW});
+  assert.deepEqual(a.items, b.items);
+  const seeds = new Set([1, 2, 3, 4, 5, 6].map(s => generate({equipment: GYM, duration: 60, seed: s, now: NOW}).items.map(i => i.id).join()));
+  assert.ok(seeds.size > 1, 'shuffle changes picks');
+});
+
+test('focus choices produce sensible first exercises', () => {
+  const first = f => EX[generate({equipment: GYM, focus: f, duration: 60, seed: 2, now: NOW}).items[0].id];
+  assert.equal(first('push').p, 'hpush');
+  assert.equal(first('pull').p, 'vpull');
+  assert.equal(first('legs').p, 'knee');
+});
+
+test('alternatives stay within equipment and pattern', () => {
+  const alt = alternatives('bench', HOME);
+  assert.ok(alt.length > 0);
+  for (const id of alt) assert.ok(canDo(EX[id], HOME));
+  assert.ok(alt.includes('dbbench'));
+});
+
+test('double progression adds weight only when every set hits the top', () => {
+  const item = {id: 'bench', sets: 3, lo: 6, hi: 10};
+  const hit = suggestLoad([wk(72, [{id: 'bench', sets: sets(3, 80, 10)}])], item, {now: NOW});
+  assert.equal(hit.kg, 82.5);
+  assert.ok(hit.up);
+  const miss = suggestLoad([wk(72, [{id: 'bench', sets: [{kg: 80, reps: 10}, {kg: 80, reps: 9}, {kg: 80, reps: 8}]}])], item, {now: NOW});
+  assert.equal(miss.kg, 80);
+  assert.ok(!miss.up);
+  const first = suggestLoad([], item, {now: NOW});
+  assert.equal(first.kg, null);
+  assert.ok(first.first);
+});
+
+test('helpers', () => {
+  assert.equal(Math.round(e1rm(100, 5)), 117);
+  assert.equal(roundLoad(EX.bench, 81.3), 82.5);
+});
