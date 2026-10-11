@@ -2,7 +2,7 @@
  * Local storage of settings, gym profiles and the workout log.
  * Data stays on the phone; export and import move it between devices.
  */
-import {EQUIPMENT, EX, PLANS} from './data/catalog.js';
+import {EQUIPMENT, EX, MUSCLES, PLANS} from './data/catalog.js';
 
 const KEY = 'tnm-v1';
 const ALL = EQUIPMENT.map(e => e[0]);
@@ -17,7 +17,7 @@ export function defaultState() {
     v: 1,
     settings: {
       mode: 'auto', plan: 'fbw3', next: 0, profile: 'gym', duration: 60, focus: 'auto',
-      bar: 20, bw: 80, subs: {}, exclude: [], cycleStart: null, welcomed: false, updatedAt: 0,
+      bar: 20, bw: 80, subs: {}, exclude: [], cycleStart: null, welcomed: false, updatedAt: 0, dayPick: null,
     },
     profiles: defaultProfiles(),
     customPlans: [],
@@ -27,20 +27,34 @@ export function defaultState() {
   };
 }
 
-/** Clean a user-built plan: known exercises only, sane numbers. Returns null when nothing usable is left. */
+/**
+ * Clean a user-built plan: known exercises only, sane numbers.
+ * A weekly plan (week: true) ties each day to a weekday (wd, Monday = 0) and its muscle groups (mus).
+ * Returns null when the input is not a plan.
+ */
 export function cleanPlan(p) {
   if (!p || typeof p !== 'object' || !Array.isArray(p.days)) return null;
   const num = (v, lo, hi, d) => (Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.round(+v))) : d);
-  const days = p.days.slice(0, 7).map((d, i) => ({
-    name: String((d && d.name) || 'Dzień ' + (i + 1)).slice(0, 24),
-    ex: (d && Array.isArray(d.ex) ? d.ex : []).filter(e => e && EX[e.id]).slice(0, 15).map(e => {
-      const lo = num(e.lo, 1, 100, 8);
-      return {id: e.id, sets: num(e.sets, 1, 10, 3), lo, hi: Math.max(lo, num(e.hi, 1, 100, 12)), rest: num(e.rest, 15, 600, 90)};
-    }),
-  }));
-  return {id: String(p.id || 'c' + Date.now().toString(36)), name: String(p.name || 'Mój plan').slice(0, 30), days};
+  const week = !!p.week;
+  const seen = new Set();
+  let days = p.days.slice(0, 7).map((d, i) => {
+    const o = {
+      name: String((d && d.name) || 'Dzień ' + (i + 1)).slice(0, 24),
+      ex: (d && Array.isArray(d.ex) ? d.ex : []).filter(e => e && EX[e.id]).slice(0, 15).map(e => {
+        const lo = num(e.lo, 1, 100, 8);
+        return {id: e.id, sets: num(e.sets, 1, 10, 3), lo, hi: Math.max(lo, num(e.hi, 1, 100, 12)), rest: num(e.rest, 15, 600, 90)};
+      }),
+    };
+    if (week) { o.wd = num(d && d.wd, 0, 6, i); o.mus = (d && Array.isArray(d.mus) ? d.mus : []).filter(m => MUSCLES[m]); }
+    return o;
+  });
+  if (week) days = days.filter(d => !seen.has(d.wd) && seen.add(d.wd)).sort((a, b) => a.wd - b.wd);
+  const out = {id: String(p.id || 'c' + Date.now().toString(36)), name: String(p.name || 'Mój plan').slice(0, 30), days};
+  if (week) out.week = true;
+  return out;
 }
 
+const o0 = v => (v && typeof v === 'object' ? v : {});
 const validWorkout = w => w && typeof w.id === 'string' && w.date && Array.isArray(w.ex);
 
 /** Bring any stored shape (this app or the earlier prototype) to the current one. */
@@ -65,6 +79,7 @@ export function migrate(d) {
   }
   if (!s.profiles.some(p => p.id === s.settings.profile)) s.settings.profile = s.profiles[0].id;
   if (Array.isArray(d.workouts)) s.workouts = d.workouts.filter(validWorkout);
+  if (o0(d.settings).dayPick && typeof d.settings.dayPick === 'object') s.settings.dayPick = {stamp: String(d.settings.dayPick.stamp), idx: +d.settings.dayPick.idx || 0};
   if (d.draft && Array.isArray(d.draft.ex)) s.draft = d.draft;
   if (d.today && Array.isArray(d.today.items)) s.today = d.today;
   return s;

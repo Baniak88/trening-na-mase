@@ -1,4 +1,4 @@
-/* Exercise catalog: 50 exercises with technique figures, coaching marks and faults. Ported from the prototype. */
+/* Exercise catalog: 50 exercises (38 with evidence of muscle growth) with technique figures, coaching marks and faults. Ported from the prototype. */
 /* ---------- Muscles, exercises, plans ---------- */
 const MUSCLES={chest:'Klatka',back:'Plecy',delts:'Barki',biceps:'Biceps',triceps:'Triceps',quads:'Czworogłowe',hams:'Dwugłowe ud',glutes:'Pośladki',calves:'Łydki',abs:'Brzuch'};
 const PATTERNS=[['knee','Przysiad i wykrok'],['hinge','Zawias biodrowy'],['hpush','Pchanie poziome'],['vpush','Pchanie pionowe'],['hpull','Przyciąganie poziome'],['vpull','Przyciąganie pionowe'],['iso','Izolacja: ramiona, barki, nogi'],['core','Core i noszenie']];
@@ -544,6 +544,54 @@ export const KINDN={bar:'Sztanga',db:'Hantle',machine:'Maszyna',cable:'Wyciąg',
 /** Muscle size class drives recovery time and weekly set targets. */
 export const MUSCLE_INFO={chest:{h:72,target:[10,20]},back:{h:72,target:[10,20]},quads:{h:72,target:[10,20]},hams:{h:72,target:[10,20]},glutes:{h:72,target:[10,20]},
  delts:{h:48,target:[10,20]},biceps:{h:48,target:[8,16]},triceps:{h:48,target:[8,16]},calves:{h:36,target:[6,16]},abs:{h:36,target:[6,16]}};
+/* ---------- Evidence of muscle growth ----------
+   A = the exercise itself was trained in a study that measured muscle growth.
+   B = a close variant (same movement, other equipment) or a training programme with it measured growth;
+       free weights and machines grow muscle equally (Haugen 2023).
+   Exercises without growth data are hidden from generator, plans, pickers and the catalogue. */
+export const SOURCES={
+ kubo19:['Kubo i in. 2019: głębokość przysiadu a objętość mięśni ud i pośladków','https://pubmed.ncbi.nlm.nih.gov/?term=Kubo+2019+squat+training+different+depths+muscle+volumes'],
+ fonseca14:['Fonseca i in. 2014: przysiad, suwnica, martwy ciąg i wykroki a przekrój czworogłowego','https://paulogentil.com/pdf/Changes%20in%20exercises%20are%20more%20effective%20than%20in%20loading%20schemes%20to%20improve%20muscle%20strength.pdf'],
+ maeo23q:['Maeo i in. 2023: prostowanie nóg siedząc vs leżąc, przyrost prostego uda','https://pubmed.ncbi.nlm.nih.gov/?term=Maeo+rectus+femoris+hypertrophy+seated+prone+leg+extension'],
+ maeo21:['Maeo i in. 2021: uginanie nóg siedząc vs leżąc, przyrost dwugłowych','https://pubmed.ncbi.nlm.nih.gov/?term=Maeo+2021+greater+hamstrings+muscle+hypertrophy+long+muscle+lengths'],
+ sldl24:['2024: martwy ciąg na prostych nogach vs nordic, przyrost dwugłowych (preprint)','https://www.medrxiv.org/content/10.1101/2024.12.17.24319207.full.pdf'],
+ plotkin23:['Plotkin i in. 2023: hip thrust i przysiad dają podobny przyrost pośladków','https://www.frontiersin.org/journals/physiology/articles/10.3389/fphys.2023.1279170/full'],
+ kino23:['Kinoshita i in. 2023: wspięcia stojąc vs siedząc, przyrost łydek','https://www.frontiersin.org/journals/physiology/articles/10.3389/fphys.2023.1272106/full'],
+ ogas13:['Ogasawara i in. 2013: wyciskanie leżąc, przyrost klatki i tricepsa','https://pubmed.ncbi.nlm.nih.gov/?term=Ogasawara+2013+bench+press+continuous+periodic+hypertrophy'],
+ chaves20:['Chaves i in. 2020: wyciskanie na skosie vs płasko, przyrost górnej klatki','https://pmc.ncbi.nlm.nih.gov/articles/PMC7449336/'],
+ kikuchi17:['Kikuchi, Nakazato 2017: pompki i wyciskanie dają podobny przyrost','https://pubmed.ncbi.nlm.nih.gov/?term=Kikuchi+Nakazato+2017+push-up+bench+press+hypertrophy'],
+ latr25:['2025: unoszenie bokiem z hantlami vs na wyciągu, przyrost barków','https://www.frontiersin.org/journals/physiology/articles/10.3389/fphys.2025.1611468/full'],
+ paoli16:['Paoli i in. 2016: ściąganie, wiosłowanie i wyciskanie nad głowę, przyrost włókien najszerszego','https://www.mdpi.com/2072-6643/8/6/331'],
+ mann19:['Mannarino i in. 2019: uginanie na modlitewniku i wiosłowanie, przyrost bicepsa','https://pubmed.ncbi.nlm.nih.gov/?term=Mannarino+2019+preacher+curl+dumbbell+row+biceps'],
+ maeo23t:['Maeo i in. 2023: triceps nad głową vs prostowanie na wyciągu','https://pubmed.ncbi.nlm.nih.gov/?term=Maeo+2023+triceps+brachii+hypertrophy+overhead'],
+ haugen23:['Haugen i in. 2023: wolne ciężary a maszyny dają podobny przyrost (metaanaliza)','https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7'],
+};
+const EVID={
+ squat:['A','kubo19'],legpress:['B','fonseca14'],hack:['B','haugen23'],goblet:['B','kubo19'],bss:['B','fonseca14'],lunge:['B','fonseca14'],legext:['A','maeo23q'],
+ deadlift:['B','fonseca14'],rdl:['A','sldl24'],dbrdl:['B','sldl24'],hipthrust:['A','plotkin23'],legcurl:['A','maeo21'],lyingcurl:['A','maeo21'],
+ calf:['A','kino23'],seatedcalf:['A','kino23'],
+ bench:['A','ogas13'],dbbench:['B','haugen23'],incline:['A','chaves20'],pushup:['A','kikuchi17'],chestpress:['B','haugen23'],
+ ohp:['B','paoli16'],dbohp:['B','paoli16'],machpress:['B','haugen23'],latraise:['A','latr25'],cablelat:['A','latr25'],
+ latpull:['B','paoli16'],pullup:['B','paoli16'],cablerow:['B','paoli16'],row:['B','paoli16'],dbrow:['B','mann19'],machinerow:['B','haugen23'],
+ curl:['B','mann19'],cablecurl:['B','mann19'],inclinecurl:['B','mann19'],
+ ropeoh:['A','maeo23t'],pushdown:['A','maeo23t'],triext:['B','maeo23t'],skull:['B','maeo23t'],
+};
+export const EV_NAME={A:'Badanie przyrostu',B:'Zbadany wariant lub program'};
+for(const id in EX){const e=EVID[id];EX[id].ev=e?{l:e[0],s:e[1]}:null;EX[id].hidden=!e;}
+/** Exercise has evidence of muscle growth and may be suggested. */
+export const usable=ex=>!!ex&&!ex.hidden;
+/** Muscles that have at least one usable exercise as a main mover. */
+export const TRAINABLE=Object.keys(MUSCLES).filter(m=>Object.values(EX).some(e=>usable(e)&&e.m[m]>=1));
+/* Built-in plans: swap out exercises without growth data. */
+PLANS.fbw3.days[2].ex[5]=x('cablelat',2,12,20,60);
+PLANS.ul4.days[2].ex[2]=x('chestpress',3,8,12,120);
+PLANS.ppl5.days[2].ex[1]=x('dbbench',3,8,12,120);
+PLANS.ppl5.days[2].ex[2]=x('chestpress',2,10,12,120);
+PLANS.ppl5.days[3].ex[3]=x('cablelat',3,12,20,60);
+PLANS.ppl5.days[3].ex[4]=x('inclinecurl',3,10,15,60);
+PLANS.ppl5.days[4].ex[5]=x('legcurl',3,10,15,90);
+for(const k in PLANS)for(const d of PLANS[k].days)d.ex=d.ex.filter(e=>usable(EX[e.id]));
+for(const id in EX)if(EX[id].alt)EX[id].alt=EX[id].alt.filter(a=>usable(EX[a]));
 /* Start/end photos from free-exercise-db (public domain), stored as img/ex/<id>-0.jpg and -1.jpg. */
 export const PHOTO_CREDIT=['free-exercise-db','https://github.com/yuhonas/free-exercise-db'];
 for(const id in EX)EX[id].photo='img/ex/'+id;

@@ -101,3 +101,41 @@ test('helpers', () => {
   assert.equal(Math.round(e1rm(100, 5)), 117);
   assert.equal(roundLoad(EX.bench, 81.3), 82.5);
 });
+
+test('only exercises with growth evidence are suggested', async () => {
+  const {usable, PLANS} = await import('../js/data/catalog.js');
+  for (const id of ['facepull', 'plank', 'farmer', 'stepup', 'dips']) assert.equal(usable(EX[id]), false, id);
+  for (const [id, ex] of Object.entries(EX)) if (usable(ex)) assert.ok(['A', 'B'].includes(ex.ev.l) && ex.ev.s, id + ' evidence');
+  for (const p of Object.values(PLANS)) for (const d of p.days) for (const e of d.ex) assert.ok(usable(EX[e.id]), 'plan uses ' + e.id);
+  for (const focus of ['full', 'upper', 'lower', 'push', 'pull', 'legs']) {
+    const g = generate({workouts: [], equipment: GYM, duration: 90, focus, seed: 5, now: NOW});
+    assert.ok(g.items.length >= 3, focus);
+    for (const it of g.items) assert.ok(usable(EX[it.id]), focus + ' picked ' + it.id);
+  }
+  for (const id of alternatives('bench', GYM)) assert.ok(usable(EX[id]), 'alt ' + id);
+});
+
+test('weekly planner fills a day with the chosen muscles', async () => {
+  const {fillDay, weekDays, dayFor, nextDay, weekdayOf, PRESETS} = await import('../js/engine/planner.js');
+  const {usable, primary, isCompound} = await import('../js/data/catalog.js');
+  const day = fillDay(['chest', 'biceps'], {equipment: GYM});
+  const hit = new Set(day.flatMap(e => primary(EX[e.id])));
+  assert.ok(hit.has('chest') && hit.has('biceps'));
+  assert.ok(day.every(e => usable(EX[e.id]) && (primary(EX[e.id]).includes('chest') || primary(EX[e.id]).includes('biceps'))), 'only chosen muscles');
+  assert.ok(isCompound(EX[day[0].id]), 'compound first');
+  assert.equal(new Set(day.map(e => e.id)).size, day.length, 'no duplicates');
+  const sets = m => day.filter(e => primary(EX[e.id]).includes(m)).reduce((a, e) => a + e.sets, 0);
+  assert.ok(sets('chest') >= 6 && sets('chest') <= 12, 'chest sets ' + sets('chest'));
+  const home = fillDay(['back', 'quads', 'delts'], {equipment: HOME});
+  assert.ok(home.length >= 3 && home.every(e => canDo(EX[e.id], HOME)), 'home equipment');
+  assert.ok(fillDay(['chest', 'back', 'delts', 'biceps', 'triceps', 'quads'], {equipment: GYM}).length <= 8, 'day stays short');
+  assert.deepEqual(fillDay([], {equipment: GYM}), []);
+  assert.deepEqual(fillDay(['chest'], {equipment: GYM, seed: 4}), fillDay(['chest'], {equipment: GYM, seed: 4}), 'deterministic');
+  const days = weekDays(PRESETS[0].days, {equipment: GYM});
+  assert.equal(days[0].wd, 0);
+  assert.equal(days[0].name, 'Klatka + Biceps');
+  assert.equal(dayFor(days, 2), null, 'Wednesday is a rest day');
+  assert.equal(nextDay(days, 2).day.wd, 3);
+  assert.equal(nextDay(days, 4).inDays, 3, 'Friday to Monday');
+  assert.equal(weekdayOf(new Date(2026, 9, 12)), 0, '12 Oct 2026 is a Monday');
+});

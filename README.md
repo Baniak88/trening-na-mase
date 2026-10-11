@@ -8,10 +8,13 @@ Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na ka�
 
 ## Co potrafi
 
+- **Plan tygodnia.** Wybierasz dni i partie mięśni, np. poniedziałek: klatka + biceps, środa: barki + triceps. Ćwiczenia dobierają się same (możesz je zmienić), a ekran główny pokazuje trening na dzisiejszy dzień tygodnia. W dni wolne widać, kiedy jest następny trening.
+- **Tylko ćwiczenia z badaniami przyrostu.** 38 ćwiczeń: A = ćwiczenie trenowane w badaniu, które zmierzyło przyrost mięśni; B = bliski wariant albo program z tym ćwiczeniem. Źródło widać przy każdym ćwiczeniu. Ćwiczenia bez takich danych (np. face pull, deska, spacer farmera) są ukryte.
+- **Prosty wygląd** w stylu iOS: duże tytuły, listy grupowane, jasny i ciemny motyw.
 - **Trening na dziś generowany automatycznie.** Wybiera wypoczęte partie mięśni, dobiera ćwiczenia do sprzętu i mieści się w wybranym czasie (30–90 min). Możesz wymusić zakres: całe ciało, góra, dół, push, pull, nogi.
 - **Mapa regeneracji.** Sylwetka z przodu i z tyłu pokazuje kolorami, które mięśnie są gotowe, a które jeszcze odpoczywają, i za ile godzin wrócą do formy.
 - **Siłownie ze sprzętem.** Np. „Siłownia” i „Dom”. Generator proponuje tylko ćwiczenia, które zrobisz w danym miejscu.
-- **50 ćwiczeń z animacją techniki:** linie kontrolne, fazy ruchu, typowe błędy pokazane na animacji, wskazówki i zamienniki.
+- **Ćwiczenia z animacją techniki:** linie kontrolne, fazy ruchu, typowe błędy pokazane na animacji, wskazówki i zamienniki.
 - **Zdjęcia ćwiczeń:** prawdziwe zdjęcia pozycji startowej i końcowej dla każdego ćwiczenia, z [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (domena publiczna).
 - **Trening krok po kroku:** jedno ćwiczenie na ekranie, duże przyciski do ciężaru i powtórzeń, timer przerwy z dźwiękiem, serie rozgrzewkowe, kalkulator talerzy.
 - **Progresja:** podwójna progresja (najpierw powtórzenia, potem ciężar), rekordy, szacowany 1RM, wykresy postępów.
@@ -65,6 +68,8 @@ Projekt nie ma kroku budowania ani zależności. Wystarczy dowolny serwer plikó
 3. Do każdego miejsca wybiera ćwiczenie dostępne na sprzęcie: znane ćwiczenia i wolne ciężary w głównych bojach mają pierwszeństwo, ćwiczenia z ostatniego treningu są mniej prawdopodobne. Przycisk „Inne ćwiczenia” zmienia ziarno losowania.
 4. Dokłada ćwiczenia, dopóki mieści się w czasie (rozgrzewka 8 min + serie × (przerwa + ok. 40 s)).
 
+**Plan tygodnia** (`js/engine/planner.js`). Dla wybranych partii dobiera ćwiczenia z dowodami przyrostu: najpierw wielostawowe, potem izolacje. Duża partia dostaje 2–3 ćwiczenia, mała 1–2 (mniej, gdy dzień ma 3+ partie), maksymalnie 8 ćwiczeń dziennie. Preferuje ćwiczenia z poziomem A i różne wzorce ruchu.
+
 **Progresja** (`js/engine/progression.js`). Ten sam ciężar, dopóki wszystkie serie nie dojdą do górnej granicy zakresu powtórzeń, potem ciężar rośnie o krok ćwiczenia. Po przerwie dłuższej niż 4 tygodnie start od 90% ostatniego ciężaru.
 
 ## Struktura
@@ -79,7 +84,7 @@ js/store.js             zapis danych, eksport i import
 js/figure.js            rysowanie i animacja ćwiczeń
 js/bodymap.js           mapa regeneracji mięśni
 js/data/catalog.js      ćwiczenia, plany, sprzęt
-js/engine/              regeneracja, generator, progresja
+js/engine/              regeneracja, generator, plan tygodnia, progresja
 tests/                  testy algorytmu
 ```
 

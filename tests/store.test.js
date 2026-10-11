@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {defaultState, importData, migrate, exportJSON} from '../js/store.js';
+import {cleanPlan, defaultState, importData, migrate, exportJSON} from '../js/store.js';
 
 const proto = {app: 'trening-na-mase-prototyp',
   settings: {plan: 'ul4', equip: 'mach', next: 2, bar: 15, bw: 82, subs: {squat: 'hack'}, cycleStart: '2026-10-05T00:00:00.000Z', onboarded: true},
@@ -63,4 +63,19 @@ test('custom plans survive export, import and cleaning', () => {
 
 test('missing custom plan falls back to a built-in plan', () => {
   assert.equal(migrate({settings: {plan: 'c_gone'}}).settings.plan, 'fbw3');
+});
+
+test('weekly plans keep weekdays and muscles', () => {
+  const c = cleanPlan({id: 'w1', name: 'Tydzień', week: true, days: [
+    {name: 'Barki', wd: 2, mus: ['delts', 'nope'], ex: [{id: 'ohp', sets: 3, lo: 6, hi: 10, rest: 150}]},
+    {name: 'Klatka', wd: 0, mus: ['chest', 'biceps'], ex: [{id: 'bench', sets: 4, lo: 6, hi: 10, rest: 180}]},
+    {name: 'Dubel', wd: 0, mus: ['back'], ex: []},
+  ]});
+  assert.equal(c.week, true);
+  assert.deepEqual(c.days.map(d => d.wd), [0, 2], 'sorted, one day per weekday');
+  assert.deepEqual(c.days[1].mus, ['delts']);
+  const s = migrate({customPlans: [c], settings: {mode: 'plan', plan: 'w1', dayPick: {stamp: '2026-10-12', idx: 1}}});
+  assert.equal(s.settings.plan, 'w1');
+  assert.deepEqual(s.settings.dayPick, {stamp: '2026-10-12', idx: 1});
+  assert.equal(cleanPlan({days: [{name: 'A', ex: []}]}).week, undefined, 'old plans stay sequential');
 });

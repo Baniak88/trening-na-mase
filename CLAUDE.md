@@ -21,4 +21,8 @@ PWA bez kroku budowania: czysty HTML, CSS i moduły ES, hostowane na GitHub Page
 
 ## Ćwiczenia
 Ćwiczenie w `js/data/catalog.js` potrzebuje: nazwy, wzorca (`p`), rodzaju sprzętu (`kind`), mięśni (`m`: 1 = główny, 0,5 = pomocniczy),
-wskazówek, błędów, zamienników, rysunku (`fig`: pozy A i B, sprzęt), opisu faz i linii kontrolnych (`ANN`) oraz wpisu w `NEEDS`.
+wskazówek, błędów, zamienników, rysunku (`fig`: pozy A i B, sprzęt), opisu faz i linii kontrolnych (`ANN`), wpisu w `NEEDS`
+oraz dowodu przyrostu w `EVID` (poziom A/B i klucz z `SOURCES`). Bez wpisu w `EVID` ćwiczenie jest ukryte.
+
+## Plan tygodnia
+Własny plan z `week: true` ma dni z `wd` (0 = poniedziałek) i `mus` (partie). Ćwiczenia dobiera `fillDay` w `js/engine/planner.js`.

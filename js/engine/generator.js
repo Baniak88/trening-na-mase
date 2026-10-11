@@ -10,11 +10,12 @@
  * 3. Fill each slot with the best available exercise: familiar exercises and
  *    free weights for the main lifts score higher, last session's picks score
  *    lower for variety, and a seeded jitter lets "shuffle" give new picks.
+ *    Only exercises with evidence of muscle growth are used (see catalog EVID).
  * 4. Stop when the time budget is used.
  *
  * Pure function: same inputs and seed give the same workout.
  */
-import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, canDo, isCompound, primary} from '../data/catalog.js';
+import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, canDo, isCompound, primary, usable} from '../data/catalog.js';
 import {recovery, weeklySets} from './recovery.js';
 
 export const FOCUS = {
@@ -29,19 +30,18 @@ export const FOCUS = {
 
 const UPPER = ['chest', 'back', 'delts', 'biceps', 'triceps'];
 const LOWER = ['quads', 'hams', 'glutes'];
-const REAR_DELT = ['facepull', 'revpec'];
 /** Pattern exercises that work better as accessories than as the main lift. */
-const ACCESSORY = ['straightpd', 'stepup', 'pushup', 'hack'];
+const ACCESSORY = ['pushup', 'hack'];
 
 /** Muscles a movement pattern mainly loads (used for readiness checks). */
 export const PATTERN_MUSCLES = {knee: ['quads', 'glutes'], hinge: ['hams', 'glutes'], hpush: ['chest'], vpush: ['delts'], hpull: ['back'], vpull: ['back']};
 
 const SLOTS = {
-  full: [{p: 'knee'}, {p: 'hpush'}, {p: 'hpull'}, {p: 'hinge'}, {p: 'vpull'}, {p: 'vpush'}, {m: 'delts'}, {m: 'biceps'}, {m: 'triceps'}, {m: 'calves'}, {m: 'abs'}],
-  upper: [{p: 'hpush'}, {p: 'hpull'}, {p: 'vpush'}, {p: 'vpull'}, {m: 'chest'}, {m: 'delts'}, {m: 'biceps'}, {m: 'triceps'}, {m: 'delts', rear: 1}, {m: 'abs'}],
-  lower: [{p: 'knee'}, {p: 'hinge'}, {p: 'knee'}, {m: 'hams'}, {m: 'quads'}, {m: 'calves'}, {m: 'glutes'}, {m: 'abs'}],
+  full: [{p: 'knee'}, {p: 'hpush'}, {p: 'hpull'}, {p: 'hinge'}, {p: 'vpull'}, {p: 'vpush'}, {m: 'delts'}, {m: 'biceps'}, {m: 'triceps'}, {m: 'calves'}],
+  upper: [{p: 'hpush'}, {p: 'hpull'}, {p: 'vpush'}, {p: 'vpull'}, {m: 'chest'}, {m: 'delts'}, {m: 'biceps'}, {m: 'triceps'}],
+  lower: [{p: 'knee'}, {p: 'hinge'}, {p: 'knee'}, {m: 'hams'}, {m: 'quads'}, {m: 'calves'}, {m: 'glutes'}],
   push: [{p: 'hpush'}, {p: 'vpush'}, {p: 'hpush'}, {m: 'chest'}, {m: 'delts'}, {m: 'triceps'}, {m: 'triceps'}],
-  pull: [{p: 'vpull'}, {p: 'hpull'}, {p: 'hpull'}, {m: 'delts', rear: 1}, {m: 'biceps'}, {m: 'biceps'}, {m: 'abs'}],
+  pull: [{p: 'vpull'}, {p: 'hpull'}, {p: 'hpull'}, {m: 'back'}, {m: 'biceps'}, {m: 'biceps'}],
   legs: [{p: 'knee'}, {p: 'hinge'}, {p: 'knee'}, {m: 'hams'}, {m: 'quads'}, {m: 'glutes'}, {m: 'calves'}],
 };
 const MAX_EX = {30: 4, 45: 6, 60: 7, 75: 8, 90: 9};
@@ -85,8 +85,7 @@ export const exSeconds = it => it.sets * (it.rest + 40);
 
 function candidates(slot, pool, used) {
   let c;
-  if (slot.p) c = pool.filter(ex => ex.p === slot.p && !REAR_DELT.includes(ex.id));
-  else if (slot.rear) c = pool.filter(ex => REAR_DELT.includes(ex.id));
+  if (slot.p) c = pool.filter(ex => ex.p === slot.p);
   else {
     c = pool.filter(ex => primary(ex).includes(slot.m) && !isCompound(ex));
     if (!c.length) c = pool.filter(ex => primary(ex).includes(slot.m));
@@ -125,7 +124,7 @@ export function generate({workouts = [], equipment = [], duration = 60, focus = 
   const manual = focus !== 'auto';
   const minReady = manual || light ? 35 : 60;
   const rand = rng(seed);
-  const pool = Object.values(EX).filter(ex => canDo(ex, equipment) && !exclude.includes(ex.id));
+  const pool = Object.values(EX).filter(ex => usable(ex) && canDo(ex, equipment) && !exclude.includes(ex.id));
   const sorted = [...workouts].sort((a, b) => +new Date(b.date) - +new Date(a.date));
   const known = new Set(sorted.flatMap(w => w.ex.map(e => e.id)));
   const lastIds = new Set(sorted[0] ? sorted[0].ex.map(e => e.id) : []);
@@ -192,7 +191,7 @@ export function alternatives(id, equipment, usedIds = []) {
   const prim = primary(ex);
   const used = new Set(usedIds);
   return Object.values(EX)
-    .filter(o => o.id !== id && !used.has(o.id) && canDo(o, equipment))
+    .filter(o => o.id !== id && usable(o) && !used.has(o.id) && canDo(o, equipment))
     .map(o => {
       let s = 0;
       if (isCompound(ex) && o.p === ex.p) s += 3;
