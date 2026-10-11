@@ -7,6 +7,7 @@ import {suggestLoad, sessionsOf, e1rm, fmt} from './engine/progression.js';
 import {WEEKDAYS, WD_SHORT, PRESETS, fillDay, dayName, weekDays, weekdayOf, nextDay} from './engine/planner.js';
 import {load, save, persist, exportJSON, importData, defaultState} from './store.js';
 import {bodyMap, targetMap} from './bodymap.js';
+import {HEADS, headName, headsOf, headWhy, mainHeads, headCoverage} from './data/heads.js';
 
 /* ---------- Helpers ---------- */
 const PLATES = [[25, '--p25', 44, 9], [20, '--p20', 44, 8], [15, '--p15', 40, 7], [10, '--p10', 34, 6], [5, '--p5', 26, 5], [2.5, '--p2', 22, 4], [1.25, '--p1', 18, 3]];
@@ -39,11 +40,18 @@ const tightBox = id => tightBoxes[id] || (tightBoxes[id] = figBounds(EX[id], 'au
 const thumbCache = {};
 const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
 
+/** "Triceps: głowa długa" for the first primary muscle that has heads. */
+function headLine(ex) {
+  const m = primary(ex).find(k => HEADS[k]); if (!m) return '';
+  const hs = mainHeads(ex, m); if (!hs.length || hs.length === HEADS[m].length) return MUSCLES[m] + ': cały mięsień';
+  return MUSCLES[m] + ': ' + hs.map(headName).join(', ');
+}
+
 /* ---------- State ---------- */
 const S = load();
 if (!S.settings.cycleStart) S.settings.cycleStart = weekStart().toISOString();
 const UI = {stack: [], permSwap: false, tab: 'train', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
-  aq: '', am: 'all', ak: 'all', all: false, mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
+  aq: '', am: 'all', ah: 'all', ak: 'all', all: false, mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
 let saveT = null;
 function persistNow() { clearTimeout(saveT); save(S); }
 function persistSoon() { clearTimeout(saveT); saveT = setTimeout(() => save(S), 400); }
@@ -291,6 +299,10 @@ function exSheet() {
     const why = ctx && ctx.from === 'today' && S.today && S.today.items[ctx.idx] ? S.today.items[ctx.idx].why : '';
     if (why) h += '<p class="whytoday"><b>Dlaczego dziś:</b> ' + esc(why) + '</p>';
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Mięśnie</div><div class="row">' + prim.map(k => '<span class="chip m prim">' + MUSCLES[k] + '</span>').join('') + sec.map(k => '<span class="chip m">' + MUSCLES[k] + ' · pomocniczo</span>').join('') + '</div></div>';
+    { const hd = headsOf(ex); const byM = {};
+      for (const k in hd) { const m = k.split('.')[0]; (byM[m] = byM[m] || []).push([k, hd[k]]); }
+      const ms = Object.keys(byM).sort((a, b) => (ex.m[b] || 0) - (ex.m[a] || 0));
+      if (ms.length) h += '<div class="stack" style="gap:8px"><div class="sec-t">Które części mięśni</div><ul class="heads">' + ms.map(m => '<li><span class="hm">' + MUSCLES[m] + '</span><span class="hh">' + HEADS[m].map(([hk, hn]) => { const w = (byM[m].find(x => x[0] === m + '.' + hk) || [0, 0])[1]; return '<span class="hchip w' + (w >= 1 ? 2 : w > 0 ? 1 : 0) + '">' + hn + '</span>'; }).join('') + '</span></li>').join('') + '</ul><div class="legend small"><span><i class="hl2"></i>główny akcent</span><span><i class="hl1"></i>pomocniczo</span><span><i class="hl0"></i>słabo lub wcale</span></div>' + (headWhy(ex) ? '<p class="whytoday">' + headWhy(ex) + '</p>' : '') + '</div>'; }
     if (!ex.ev) h += '<p class="notice small"><b>Bez badań przyrostu.</b> Nie dobieram go automatycznie, ale możesz dodać je do planu sam.</p>';
     if (ex.ev) { const src = SOURCES[ex.ev.s]; h += '<div class="evi"><span class="evb ' + ex.ev.l + '">' + ex.ev.l + '</span><div><b>' + EV_NAME[ex.ev.l] + '</b><a href="' + src[1] + '" target="_blank" rel="noopener">' + src[0] + '</a></div></div>'; }
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Sprzęt</div><p class="small">' + (ex.needs.length ? ex.needs.map(n => EQUIPMENT.find(e => e[0] === n)[1]).join(', ') : 'Bez sprzętu') + '</p></div>';
@@ -310,7 +322,7 @@ function exSheet() {
     if (locked) h += '<p class="notice small">Masz już odhaczone serie tego ćwiczenia, więc zamiana jest zablokowana.</p>';
     if (ctx) h += '<p class="muted small">Dotknij „Wybierz”, żeby zamienić. Dotknij nazwy, żeby zobaczyć technikę.</p>';
     if (ctx && ctx.from !== 'plan' && S.settings.mode === 'plan') h += '<label class="tglrow"><input type="checkbox" id="permSwap"' + (UI.permSwap ? ' checked' : '') + '> Zamień też w planie na stałe</label>';
-    h += '<ul class="list">' + alts.map(a2 => { const e2 = EX[a2]; return '<li><div class="lrow altrow"><button class="altprev" data-act="sheet-open" data-id="' + a2 + '"><span class="thumb">' + thumb(a2) + '</span><span class="lmain"><b>' + e2.n + '</b><span>' + KINDN[e2.kind] + ' · ' + primary(e2).map(m => MUSCLES[m]).join(', ') + '</span></span></button>' +
+    h += '<ul class="list">' + alts.map(a2 => { const e2 = EX[a2]; return '<li><div class="lrow altrow"><button class="altprev" data-act="sheet-open" data-id="' + a2 + '"><span class="thumb">' + thumb(a2) + '</span><span class="lmain"><b>' + e2.n + '</b><span>' + KINDN[e2.kind] + ' · ' + (headLine(e2) || primary(e2).map(m => MUSCLES[m]).join(', ')) + '</span></span></button>' +
       (ctx ? '<button class="btn sm primary" data-act="swap" data-id="' + a2 + '"' + (locked ? ' disabled' : '') + '>Wybierz</button>' : '<span class="evb ' + e2.ev.l + '">' + e2.ev.l + '</span>') + '</div></li>'; }).join('') + '</ul>';
     if (ctx && !locked) h += '<button class="btn wide" data-act="pick-replace">Wybierz z pełnej listy ćwiczeń</button>';
   }
@@ -474,6 +486,21 @@ function weekList() {
   if (c && c.days.length && !using) h += '<button class="btn wide" data-act="week-use">Trenuj według planu tygodnia</button>';
   return h + '</section>';
 }
+/** Which heads of the day's muscles get a main exercise, with a one-tap fix for gaps. */
+function coverageBlock(d, di) {
+  const cov = headCoverage(d.ex.map(e => e.id), d.mus.filter(m => HEADS[m])); const used = new Set(d.ex.map(e => e.id));
+  let gaps = '';
+  const rows = d.mus.filter(m => HEADS[m]).map(m => '<li><span class="hm">' + MUSCLES[m] + '</span><span class="hh">' + HEADS[m].map(([hk, hn]) => {
+    const key = m + '.' + hk; const w = cov[key];
+    if (w < 1) {
+      const fix = Object.values(EX).filter(e => usable(e) && !used.has(e.id) && canDo(e, equip()) && mainHeads(e, m).includes(key)).sort((a, b) => (a.ev.l > b.ev.l) - (a.ev.l < b.ev.l))[0];
+      gaps += '<li>' + MUSCLES[m] + ', ' + hn + ': ' + (fix ? 'słabo trenowane. <button class="linkbtn" data-act="pe-add" data-d="' + di + '" data-id="' + fix.id + '">+ ' + fix.n + '</button>' : (w > 0 ? 'pracuje tylko pomocniczo' : 'nie pracuje') + '. Brak ćwiczenia z badaniami przyrostu na tę część' + (key === 'delts.post' ? '; pomagają wiosłowania. Możesz dodać z pełnej listy np. odwrotne rozpiętki.' : '.')) + '</li>';
+    }
+    return '<span class="hchip w' + (w >= 1 ? 2 : w > 0 ? 1 : 0) + '">' + (w >= 1 ? '✓ ' : '') + hn + '</span>';
+  }).join('') + '</span></li>').join('');
+  if (!rows) return '';
+  return '<div class="eyebrow">Części mięśni w tym dniu</div><ul class="heads">' + rows + '</ul>' + (gaps ? '<ul class="gaps small">' + gaps + '</ul>' : '<p class="small ok-txt">Każda część wybranych mięśni ma swoje ćwiczenie.</p>');
+}
 /** Sheet for one weekday: muscle groups, then the exercises filled in for them. */
 function daySheet() {
   const wd = UI.sheet.wd; const c = weekPlanObj(); const di = c ? c.days.findIndex(x => x.wd === wd) : -1; const d = di >= 0 ? c.days[di] : null;
@@ -481,7 +508,7 @@ function daySheet() {
   let h = '<div class="wdpick" role="tablist" aria-label="Dzień tygodnia">' + WD_SHORT.map((l, w) => '<button role="tab" data-act="day-go" data-v="' + w + '" aria-selected="' + (w === wd) + '"' + (has(w) ? ' class="has"' : '') + '>' + l + '</button>').join('') + '</div>';
   h += '<div class="eyebrow">Partie mięśni</div><div class="mgrid" role="group" aria-label="Partie mięśni">' + TRAINABLE.map(m => '<button class="mtog" data-act="pe-mus" data-wd="' + wd + '" data-m="' + m + '" aria-pressed="' + !!(d && d.mus.includes(m)) + '">' + MUSCLES[m] + '</button>').join('') + '</div>';
   if (d) {
-    h += '<div class="eyebrow">Ćwiczenia · dotknij, żeby zmienić lub zamienić</div><ul class="list">' + d.ex.map((e, i) => '<li><button class="lrow" data-act="plan-ex" data-d="' + di + '" data-i="' + i + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + EX[e.id].n + '</b><span>' + e.sets + ' × ' + range(EX[e.id], e) + ' · przerwa ' + mmss(e.rest) + '</span></span><span class="chev" aria-hidden="true">›</span></button></li>').join('') + '</ul>' +
+    h += '<div class="eyebrow">Ćwiczenia · dotknij, żeby zmienić lub zamienić</div><ul class="list">' + d.ex.map((e, i) => '<li><button class="lrow" data-act="plan-ex" data-d="' + di + '" data-i="' + i + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + EX[e.id].n + '</b><span>' + e.sets + ' × ' + range(EX[e.id], e) + ' · ' + headLine(EX[e.id]) + '</span></span><span class="chev" aria-hidden="true">›</span></button></li>').join('') + '</ul>' + coverageBlock(d, di) +
       '<div class="row"><button class="btn sm" data-act="pick-open" data-target="plan" data-d="' + di + '">+ Dodaj ćwiczenie</button><button class="btn sm ghost" data-act="pe-refill" data-d="' + di + '">↻ Dobierz inne</button></div>' +
       '<button class="btn primary big" data-act="sheet-close">Gotowe</button>' +
       (wd !== weekdayOf() && d.ex.length ? '<button class="btn ghost wide" data-act="set-pick" data-v="' + di + '">Zrób ten trening dziś</button>' : '');
@@ -581,11 +608,13 @@ function viewAtlas() {
   const muscles = UI.all ? TRAINABLE.concat('abs') : TRAINABLE;
   if (!muscles.includes(UI.am)) UI.am = 'all';
   const pool = Object.values(EX).filter(e => listable(e, UI.all));
-  const list = pool.filter(e => (UI.am === 'all' || primary(e).includes(UI.am)) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())) && (!q || (e.n + ' ' + e.en + ' ' + Object.keys(e.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
+  if (UI.am === 'all' || !HEADS[UI.am] || !HEADS[UI.am].some(x => UI.am + '.' + x[0] === UI.ah)) UI.ah = 'all';
+  const list = pool.filter(e => (UI.am === 'all' || primary(e).includes(UI.am)) && (UI.ah === 'all' || mainHeads(e, UI.am).includes(UI.ah)) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())) && (!q || (e.n + ' ' + e.en + ' ' + Object.keys(e.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
   const nEv = Object.values(EX).filter(usable).length;
   let h = '<div class="atl-head"><div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Zakres"><button data-act="aall" data-v="0" aria-pressed="' + !UI.all + '">Z badaniami · ' + nEv + '</button><button data-act="aall" data-v="1" aria-pressed="' + UI.all + '">Wszystkie · ' + Object.keys(EX).length + '</button></div>' +
     '<input class="search" id="aq" type="search" placeholder="Szukaj (po polsku lub angielsku)" value="' + esc(UI.aq) + '" aria-label="Szukaj ćwiczenia">' +
     '<div class="filters" role="group" aria-label="Partia mięśni">' + [['all', 'Każda partia']].concat(muscles.map(m => [m, MUSCLES[m]])).map(([k, l]) => '<button class="pill" data-act="am" data-v="' + k + '" aria-pressed="' + (UI.am === k) + '">' + l + '</button>').join('') + '</div>' +
+    (UI.am !== 'all' && HEADS[UI.am] ? '<div class="filters" role="group" aria-label="Część mięśnia">' + [['all', 'Każda część']].concat(HEADS[UI.am].map(([k, l]) => [UI.am + '.' + k, l])).map(([k, l]) => '<button class="pill" data-act="ah" data-v="' + k + '" aria-pressed="' + (UI.ah === k) + '">' + l + '</button>').join('') + '</div>' : '') +
     '<div class="filters" role="group" aria-label="Sprzęt"><button class="pill tog" data-act="mine" aria-pressed="' + UI.mine + '">' + (UI.mine ? '✓ ' : '') + 'Mój sprzęt</button>' + [['all', 'Każdy sprzęt']].concat(KINDS).map(([k, l]) => '<button class="pill" data-act="ak" data-v="' + k + '" aria-pressed="' + (UI.ak === k) + '">' + l + '</button>').join('') + '</div></div><div class="stack">';
   h += '<p class="muted small">' + exWord(list.length) + '. <span class="evb A">A</span> badanie przyrostu z tym ćwiczeniem, <span class="evb B">B</span> bliski wariant lub program' + (UI.all ? ', <span class="evb N">–</span> bez badań (zdjęcia i opis z free-exercise-db)' : '') + '.</p>';
   if (!list.length) h += '<p class="muted">Nic nie pasuje.</p><button class="btn" data-act="af-reset">Wyczyść filtry</button>';
@@ -593,7 +622,7 @@ function viewAtlas() {
   const order = e => (e.ev ? (e.ev.l === 'A' ? 0 : 1) : 2);
   groups.forEach(m => {
     const g = list.filter(e => (UI.am === 'all' ? primary(e)[0] === m : true)).sort((a, b) => order(a) - order(b)); if (!g.length) return;
-    h += '<section class="stack" style="gap:8px"><div class="sec-h">' + MUSCLES[m] + ' <span class="muted small">' + g.length + '</span></div><ul class="list">' + g.map(e => '<li><button class="lrow' + (S.settings.exclude.includes(e.id) ? ' off' : '') + '" data-act="sheet-open" data-id="' + e.id + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + e.n + '</b><span>' + KINDN[e.kind] + ' · ' + primary(e).map(k => MUSCLES[k]).join(', ') + '</span></span>' + (e.ev ? '<span class="evb ' + e.ev.l + '" title="' + EV_NAME[e.ev.l] + '">' + e.ev.l + '</span>' : '<span class="evb N" title="Bez badań przyrostu">–</span>') + '</button></li>').join('') + '</ul></section>';
+    h += '<section class="stack" style="gap:8px"><div class="sec-h">' + MUSCLES[m] + ' <span class="muted small">' + g.length + '</span></div><ul class="list">' + g.map(e => '<li><button class="lrow' + (S.settings.exclude.includes(e.id) ? ' off' : '') + '" data-act="sheet-open" data-id="' + e.id + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + e.n + '</b><span>' + KINDN[e.kind] + ' · ' + (headLine(e) || primary(e).map(k => MUSCLES[k]).join(', ')) + '</span></span>' + (e.ev ? '<span class="evb ' + e.ev.l + '" title="' + EV_NAME[e.ev.l] + '">' + e.ev.l + '</span>' : '<span class="evb N" title="Bez badań przyrostu">–</span>') + '</button></li>').join('') + '</ul></section>';
   });
   return h + '</div>';
 }
@@ -661,7 +690,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Twój Trener · wersja 1.6</p>';
+  h += '<p class="muted small center">Twój Trener · wersja 1.7</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -898,6 +927,8 @@ function onAct(ev) {
     case 'wipe-yes': { const fresh = defaultState(); Object.keys(S).forEach(k => delete S[k]); Object.assign(S, fresh); S.settings.cycleStart = weekStart().toISOString(); UI.wipe = false; persistNow(); stopRest(); render(); toast('Dane usunięte'); break; }
     case 'am': UI.am = v; render(); break;
     case 'ak': UI.ak = v; render(); break;
+    case 'ah': UI.ah = v; render(); break;
+    case 'pe-add': addExercise('plan', b.dataset.id, +b.dataset.d); break;
     case 'aall': UI.all = v === '1'; render(); window.scrollTo(0, 0); break;
     case 'mine': UI.mine = !UI.mine; render(); break;
     case 'af-reset': UI.am = 'all'; UI.ak = 'all'; UI.aq = ''; UI.mine = false; render(); break;

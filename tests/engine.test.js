@@ -167,3 +167,25 @@ test('library exercises are listed but never picked automatically', async () => 
   assert.ok(g.items.every(it => !EX[it.id].lib));
   assert.ok(fillDay(['chest', 'back'], {equipment: [...GYM, 'kettlebell', 'bands']}).every(it => !EX[it.id].lib));
 });
+
+test('muscle heads: every evidence exercise is mapped and the planner covers different heads', async () => {
+  const {usable, primary} = await import('../js/data/catalog.js');
+  const {HEADS, headsOf, headWhy, headCoverage, mainHeads} = await import('../js/data/heads.js');
+  const {fillDay} = await import('../js/engine/planner.js');
+  for (const e of Object.values(EX).filter(usable)) {
+    for (const m of primary(e).filter(k => HEADS[k])) assert.ok(mainHeads(e, m).length, e.id + ' main head of ' + m);
+    assert.ok(headWhy(e).length > 20, e.id + ' explanation');
+  }
+  assert.deepEqual(mainHeads(EX.ropeoh, 'triceps'), ['triceps.long']);
+  assert.ok(mainHeads(EX.preacher, 'biceps').includes('biceps.short'));
+  assert.deepEqual(mainHeads(EX.seatedcalf, 'calves'), ['calves.sol']);
+  assert.ok(headsOf(EX.x_reverse_flyes)['delts.post'] === 1, 'library rear delt by name');
+  const full = ms => { const d = fillDay(ms, {equipment: GYM}); const c = headCoverage(d.map(x => x.id), ms); return Object.entries(c).filter(([, w]) => w < 1).map(([k]) => k); };
+  assert.deepEqual(full(['triceps']), [], 'triceps: all three heads');
+  assert.deepEqual(full(['biceps']), [], 'biceps: long, short, brachialis');
+  assert.deepEqual(full(['calves']), [], 'calves: gastrocnemius and soleus');
+  assert.deepEqual(full(['chest']), [], 'chest: upper and middle');
+  assert.deepEqual(full(['delts']), ['delts.post'], 'delts: front and side (no evidence-backed rear delt exercise)');
+  const quads = fillDay(['quads'], {equipment: GYM}).map(x => x.id);
+  assert.ok(!(quads.includes('legext') && quads.includes('legext1')), 'no near-duplicate variants');
+});

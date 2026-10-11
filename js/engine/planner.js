@@ -6,11 +6,14 @@
  * large muscles 6–9 sets, small ones 3–6 sets, fewer when the day trains
  * many groups, so a day stays at about 8 exercises or less.
  * Order: multi-joint lifts for large muscles first, isolation last.
+ * Exercises for one muscle aim at different heads (e.g. triceps: overhead for the
+ * long head, pushdown for the lateral and medial heads).
  *
  * Pure functions: same inputs and seed give the same day.
  */
 import {EX, MUSCLES, canDo, isCompound, primary, usable} from '../data/catalog.js';
 import {prescribe, rng} from './generator.js';
+import {mainHeads} from '../data/heads.js';
 
 export const WEEKDAYS = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
 export const WD_SHORT = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
@@ -42,6 +45,15 @@ function score(ex, m, slot, picked, rand, seed) {
   if (compound && picked.some(p => isCompound(p) && p.p === ex.p)) s -= 0.6; // e.g. a row after a pulldown
   if (!compound && picked.some(p => !isCompound(p) && primary(p).join() === primary(ex).join())) s -= 0.5;
   if (picked.some(p => p.kind === ex.kind)) s -= 0.4;
+  if (slot > 0) {
+    // Prefer a head of this muscle that the day does not train hard yet.
+    const covered = new Set(picked.flatMap(p => mainHeads(p, m)));
+    const mine = mainHeads(ex, m);
+    if (mine.some(h => !covered.has(h))) s += 1;
+    else if (mine.length) s -= 0.5;
+  }
+  const fam = e => e.base || e.id; // variants of one exercise (e.g. leg extension and its single-leg version)
+  if (picked.some(p => fam(p) === fam(ex) || p.id === ex.base || ex.id === p.base)) s -= 1.5;
   if (ACCESSORY.includes(ex.id)) s -= 1.3;
   if (ex.id === 'seatedcalf') s -= 0.3; // standing raises grew the calves more (Kinoshita 2023)
   if (slot === 0 && compound) s += {bar: 0.5, db: 0.3, machine: 0.2, cable: 0.1, bw: 0}[ex.kind] || 0;

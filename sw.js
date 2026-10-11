@@ -1,7 +1,7 @@
 /* Service worker: the app works offline at the gym.
  * App files: cache first, refreshed on each new version (bump VERSION).
  * Google Fonts: served from cache, refreshed in the background. */
-const VERSION = 'v1.6.1';
+const VERSION = 'v1.7.0';
 const CACHE = 'tnm-' + VERSION;
 const APP = [
   './',
@@ -14,6 +14,7 @@ const APP = [
   'js/bodymap.js',
   'js/data/catalog.js',
   'js/data/library.js',
+  'js/data/heads.js',
   'js/engine/recovery.js',
   'js/engine/progression.js',
   'js/engine/generator.js',

@@ -533,6 +533,7 @@ const SMITH=x=>({t:'rail',from:[x,0],to:[x,178],w:3});
 function variant(id,base,o){
   const fig=Object.assign(base?deep(EX[base].fig):{},o.fig||{});
   EX[id]={...o,fig};
+  if(base)EX[id].base=base;
 }
 /* chest */
 variant('inclinebar','incline',{n:'Wyciskanie sztangi na skosie',en:'Incline barbell press',p:'hpush',kind:'bar',inc:2.5,m:{chest:1,delts:0.5,triceps:0.5},
