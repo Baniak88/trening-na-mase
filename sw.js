@@ -1,7 +1,7 @@
 /* Service worker: the app works offline at the gym.
  * App files: cache first, refreshed on each new version (bump VERSION).
  * Google Fonts: served from cache, refreshed in the background. */
-const VERSION = 'v1.5.1';
+const VERSION = 'v1.6.0';
 const CACHE = 'tnm-' + VERSION;
 const APP = [
   './',
@@ -13,6 +13,7 @@ const APP = [
   'js/figure.js',
   'js/bodymap.js',
   'js/data/catalog.js',
+  'js/data/library.js',
   'js/engine/recovery.js',
   'js/engine/progression.js',
   'js/engine/generator.js',
@@ -51,6 +52,11 @@ self.addEventListener('fetch', e => {
         return hit || net;
       })
     );
+    return;
+  }
+  if (url.hostname === 'raw.githubusercontent.com') {
+    // Library photos from free-exercise-db: cached the first time they are shown.
+    e.respondWith(caches.open('tnm-img').then(async c => (await c.match(req)) || fetch(req).then(r => { if (r.ok || r.type === 'opaque') c.put(req, r.clone()); return r; })));
     return;
   }
   if (url.origin !== location.origin) return;

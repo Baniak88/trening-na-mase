@@ -10,6 +10,7 @@ Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na ka�
 
 - **Plan tygodnia na ekranie głównym.** Dotykasz dnia i zaznaczasz partie mięśni, np. poniedziałek: klatka + biceps, środa: barki + triceps. Ćwiczenia dobierają się same (możesz je zmienić), a ekran główny pokazuje trening na dzisiejszy dzień tygodnia. W dni wolne widać, kiedy jest następny trening.
 - **Tylko ćwiczenia z badaniami przyrostu.** 74 ćwiczenia (od 4 na łydki do kilkunastu na każdą dużą partię): A = ćwiczenie trenowane w badaniu, które zmierzyło przyrost mięśni; B = bliski wariant albo program z tym ćwiczeniem. Źródło widać przy każdym ćwiczeniu. Ćwiczenia bez takich danych (np. face pull, deska, spacer farmera) są ukryte.
+- **Biblioteka jak w Jefit:** ponad 500 ćwiczeń z filtrami po partii i sprzęcie (sztanga, hantle, maszyna, wyciąg, masa ciała, kettlebell, guma). 74 z badaniami przyrostu są domyślne i tylko one trafiają do automatycznego doboru; resztę (zdjęcia i angielski opis z free-exercise-db) możesz dodać do planu ręcznie.
 - **Prosty wygląd** w stylu iOS: duże tytuły, listy grupowane, jasny i ciemny motyw.
 - **Trening na dziś generowany automatycznie.** Wybiera wypoczęte partie mięśni, dobiera ćwiczenia do sprzętu i mieści się w wybranym czasie (30–90 min). Możesz wymusić zakres: całe ciało, góra, dół, push, pull, nogi.
 - **Mapa regeneracji.** Sylwetka z przodu i z tyłu pokazuje kolorami, które mięśnie są gotowe, a które jeszcze odpoczywają, i za ile godzin wrócą do formy.

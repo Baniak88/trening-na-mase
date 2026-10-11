@@ -1,5 +1,5 @@
 /* Twój Trener: UI. Only exercises with evidence of muscle growth are offered (catalog usable()). Screens: Trening (today / session), Regeneracja, Ćwiczenia, Postępy, Ustawienia, Wiedza. */
-import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, PLANS, CYCLE, KINDN, EQUIPMENT, PHOTO_CREDIT, SOURCES, EV_NAME, TRAINABLE, canDo, primary, usable} from './data/catalog.js';
+import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, PLANS, CYCLE, KINDN, EQUIPMENT, KINDS, PHOTO_CREDIT, SOURCES, EV_NAME, TRAINABLE, canDo, primary, usable, listable, photoSrc} from './data/catalog.js';
 import {FC, figSVG, figBounds, visMark} from './figure.js';
 import {recovery, weeklySets, status} from './engine/recovery.js';
 import {generate, alternatives, prescribe, FOCUS, exSeconds} from './engine/generator.js';
@@ -37,13 +37,13 @@ const boxes = {}, bigBoxes = {}, tightBoxes = {};
 const bigBox = id => bigBoxes[id] || (bigBoxes[id] = figBounds(EX[id], 'auto'));
 const tightBox = id => tightBoxes[id] || (tightBoxes[id] = figBounds(EX[id], 'auto', true));
 const thumbCache = {};
-const thumb = id => thumbCache[id] || (thumbCache[id] = figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}));
+const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
 
 /* ---------- State ---------- */
 const S = load();
 if (!S.settings.cycleStart) S.settings.cycleStart = weekStart().toISOString();
 const UI = {tab: 'train', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
-  aq: '', am: 'all', mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
+  aq: '', am: 'all', ak: 'all', all: false, mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
 let saveT = null;
 function persistNow() { clearTimeout(saveT); save(S); }
 function persistSoon() { clearTimeout(saveT); saveT = setTimeout(() => save(S), 400); }
@@ -202,7 +202,7 @@ function nextLabel() {
 const AN = {raf: 0, last: 0, t: 0, paused: false, speed: 1, mode: -1, marks: true, k: 0};
 const INL = {t: 0};
 function timeline(f) {
-  if (f.static) return null;
+  if (!f || f.static) return null;
   if (f.walk) return [{a: 0, b: 1, d: 700, l: 'Krótkie, szybkie kroki'}, {a: 1, b: 0, d: 700, l: 'Krótkie, szybkie kroki'}];
   const ab = f.ecc === 'AB'; const E = 'Opuszczanie: powoli, 2–3 s', C = 'Praca: dynamicznie, ok. 1 s';
   return [{a: 0, b: 0, d: 800, l: (f.sA || ['Start'])[0]}, {a: 0, b: 1, d: ab ? 2600 : 1100, l: ab ? E : C}, {a: 1, b: 1, d: 700, l: (f.sB || ['Koniec'])[0]}, {a: 1, b: 0, d: ab ? 1100 : 2600, l: ab ? C : E}];
@@ -211,7 +211,7 @@ const ease = k => 0.5 - 0.5 * Math.cos(Math.PI * k);
 function phaseAt(tl, t) { const total = tl.reduce((a, p) => a + p.d, 0); t = ((t % total) + total) % total; for (const p of tl) { if (t < p.d) return {p, k: p.a + (p.b - p.a) * ease(t / p.d)}; t -= p.d; } return {p: tl[0], k: 0}; }
 function timeForK(tl, k) { if (!tl) return 0; let t = 0; for (const p of tl) { if (p.a !== p.b) { const lo = Math.min(p.a, p.b), hi = Math.max(p.a, p.b); if (k >= lo && k <= hi) { const x = (k - p.a) / (p.b - p.a); return t + Math.acos(1 - 2 * Math.max(0, Math.min(1, x))) / Math.PI * p.d; } } t += p.d; } return 0; }
 function drawFig(label) {
-  const sh = UI.sheet; if (!sh || !sh.id) return; const f = EX[sh.id].fig; const box = $('#figAnim'); if (!box) return;
+  const sh = UI.sheet; if (!sh || !sh.id) return; const f = EX[sh.id].fig; const box = $('#figAnim'); if (!box || !f) return;
   box.innerHTML = figSVG(sh.id, AN.k, FC, bigBox(sh.id), {mode: AN.mode, marks: AN.marks, ghost: AN.marks, detail: true});
   const sl = $('#figK'); if (sl && document.activeElement !== sl) sl.value = Math.round(AN.k * 1000);
   if (label != null) { const lb = $('#figPhase'); if (lb && lb.textContent !== label) lb.textContent = label; }
@@ -259,15 +259,15 @@ function ctxUsed(ctx) {
   return [];
 }
 function exSheet() {
-  const sh = UI.sheet; const ex = EX[sh.id]; const f = ex.fig; const tl = timeline(f); const bad = f.bad || []; const bd = AN.mode >= 0 ? bad[AN.mode] : null;
+  const sh = UI.sheet; const ex = EX[sh.id]; const f = ex.fig || {}; const tl = timeline(ex.fig); if (!ex.fig) sh.view = 'photo'; const bad = f.bad || []; const bd = AN.mode >= 0 ? bad[AN.mode] : null;
   const ctx = sh.ctx; const q = ctx && ctx.from === 'session' && S.draft ? S.draft.ex[ctx.i] : null;
   const alts = alternatives(sh.id, ctx ? equip() : EQUIPMENT.map(e => e[0]), ctxUsed(ctx)).filter(a => !S.settings.exclude.includes(a));
   const pat = (PATTERNS.find(p => p[0] === ex.p) || ['', ''])[1];
   const tabs = '<div class="stabs" role="tablist">' + [['ruch', 'Ruch'], ['info', 'Wskazówki']].concat(alts.length ? [['alt', ctx ? 'Zamień' : 'Zamienniki']] : []).map(([k, l]) => '<button role="tab" data-act="stab" data-t="' + k + '" aria-selected="' + (sh.tab === k) + '">' + l + '</button>').join('') + '</div>';
   let h = '';
-  if (sh.tab === 'ruch' && ex.photo) h += '<div class="seg viewseg" role="group" aria-label="Widok"><button data-act="view" data-v="fig" aria-pressed="' + (sh.view !== 'photo') + '">Rysunek z liniami</button><button data-act="view" data-v="photo" aria-pressed="' + (sh.view === 'photo') + '">Zdjęcia</button></div>';
-  if (sh.tab === 'ruch' && sh.view === 'photo' && ex.photo) {
-    h += '<div class="photos' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + ex.photo + '-0.jpg" alt="' + esc(ex.n) + ': pozycja startowa" class="ph0"><img src="' + ex.photo + '-1.jpg" alt="' + esc(ex.n) + ': pozycja końcowa" class="ph1"><span class="phtag ph0">' + (f.sA || ['Start'])[0] + '</span><span class="phtag ph1">' + (f.sB || ['Koniec'])[0] + '</span></div>';
+  if (sh.tab === 'ruch' && ex.photo && ex.fig) h += '<div class="seg viewseg" role="group" aria-label="Widok"><button data-act="view" data-v="fig" aria-pressed="' + (sh.view !== 'photo') + '">Rysunek z liniami</button><button data-act="view" data-v="photo" aria-pressed="' + (sh.view === 'photo') + '">Zdjęcia</button></div>';
+  if (sh.tab === 'ruch' && sh.view === 'photo' && (ex.photo || ex.lib)) {
+    h += '<div class="photos' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + photoSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja startowa" class="ph0"><img src="' + photoSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja końcowa" class="ph1"><span class="phtag ph0">' + (f.sA || ['Start'])[0] + '</span><span class="phtag ph1">' + (f.sB || ['Koniec'])[0] + '</span></div>';
     h += '<div class="steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><span>1</span>' + (f.sA || ['Start'])[0] + '</button><button data-act="photo-k" data-k="2"><span>↻</span>Na zmianę</button><button data-act="photo-k" data-k="1"><span>2</span>' + (f.sB || ['Koniec'])[0] + '</button></div>';
     if (f.sA) h += '<p class="steptxt"><b>' + f.sA[0] + ':</b> ' + f.sA[1] + '</p>';
     if (f.sB) h += '<p class="steptxt"><b>' + f.sB[0] + ':</b> ' + f.sB[1] + '</p>';
@@ -288,11 +288,12 @@ function exSheet() {
     const why = ctx && ctx.from === 'today' && S.today && S.today.items[ctx.idx] ? S.today.items[ctx.idx].why : '';
     if (why) h += '<p class="whytoday"><b>Dlaczego dziś:</b> ' + esc(why) + '</p>';
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Mięśnie</div><div class="row">' + prim.map(k => '<span class="chip m prim">' + MUSCLES[k] + '</span>').join('') + sec.map(k => '<span class="chip m">' + MUSCLES[k] + ' · pomocniczo</span>').join('') + '</div></div>';
+    if (!ex.ev) h += '<p class="notice small"><b>Bez badań przyrostu.</b> Nie dobieram go automatycznie, ale możesz dodać je do planu sam.</p>';
     if (ex.ev) { const src = SOURCES[ex.ev.s]; h += '<div class="evi"><span class="evb ' + ex.ev.l + '">' + ex.ev.l + '</span><div><b>' + EV_NAME[ex.ev.l] + '</b><a href="' + src[1] + '" target="_blank" rel="noopener">' + src[0] + '</a></div></div>'; }
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Sprzęt</div><p class="small">' + (ex.needs.length ? ex.needs.map(n => EQUIPMENT.find(e => e[0] === n)[1]).join(', ') : 'Bez sprzętu') + '</p></div>';
     if (best) h += '<p class="small">Twój rekord: <b class="mono">' + kgTxt(ex, best) + '</b></p>';
-    h += '<div class="stack" style="gap:8px"><div class="sec-t">Jak wykonać</div><ul class="cues">' + ex.cues.map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
-    h += '<div class="stack" style="gap:8px"><div class="sec-t">Częste błędy</div><ul class="cues bad">' + ex.err.map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
+    h += '<div class="stack" style="gap:8px"><div class="sec-t">Jak wykonać</div>' + (ex.lib ? '<p class="muted small">Opis z bazy free-exercise-db, po angielsku.</p>' : '') + '<ul class="cues">' + ex.cues.map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
+    if (ex.err.length) h += '<div class="stack" style="gap:8px"><div class="sec-t">Częste błędy</div><ul class="cues bad">' + ex.err.map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
   } else {
     if (ctx) {
       const locked = q && q.sets.some(s => s.done);
@@ -325,12 +326,13 @@ function pickSheet() {
   const sh = UI.sheet; const q = (sh.q || '').trim().toLowerCase();
   const forPlan = sh.target === 'plan';
   const used = new Set(forPlan ? ((curPlan() || {days: []}).days[sh.d] || {ex: []}).ex.map(e => e.id) : sh.target === 'session' ? (S.draft ? S.draft.ex.map(e => e.id) : []) : (S.today ? S.today.items.map(e => e.id) : []));
-  const list = Object.values(EX).filter(ex => usable(ex) && (forPlan || canDo(ex, equip())) && !used.has(ex.id) && (!q || (ex.n + ' ' + ex.en + ' ' + Object.keys(ex.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
+  const list = Object.values(EX).filter(ex => listable(ex, sh.all) && (forPlan || canDo(ex, equip())) && !used.has(ex.id) && (!q || (ex.n + ' ' + ex.en + ' ' + Object.keys(ex.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
   // Adding to a weekly plan day: exercises for that day's muscles come first.
   const dm = forPlan ? (((curPlan() || {days: []}).days[sh.d] || {}).mus || []) : [];
   const hits = ex => primary(ex).some(m => dm.includes(m)) ? 1 : 0;
   if (dm.length) list.sort((x, y) => hits(y) - hits(x));
-  const body = '<input class="search" id="pickQ" type="search" placeholder="Szukaj: nazwa lub partia" value="' + esc(sh.q || '') + '" aria-label="Szukaj ćwiczenia"><ul class="exlist">' +
+  const body = '<div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Zakres"><button data-act="pick-all" data-v="0" aria-pressed="' + !sh.all + '">Z badaniami</button><button data-act="pick-all" data-v="1" aria-pressed="' + !!sh.all + '">Wszystkie</button></div>' +
+    '<input class="search" id="pickQ" type="search" placeholder="Szukaj: nazwa lub partia" value="' + esc(sh.q || '') + '" aria-label="Szukaj ćwiczenia"><ul class="exlist">' +
     list.map(ex => '<li><button class="exrow" data-act="pick-add" data-id="' + ex.id + '"><span class="thumb">' + thumb(ex.id) + '</span><span style="min-width:0"><span class="nm" style="display:block">' + ex.n + '</span><span class="hn" style="display:block">' + KINDN[ex.kind] + ' · ' + primary(ex).map(m => MUSCLES[m]).join(', ') + '</span></span><span class="tg">+</span></button></li>').join('') + '</ul>' +
     (list.length ? '' : '<p class="muted">Nic nie pasuje. Sprawdź sprzęt w profilu „' + esc(profile().name) + '”.</p>');
   return sheetFrame('Dodaj ćwiczenie', forPlan ? 'Wszystkie ćwiczenia' : 'Sprzęt: ' + esc(profile().name), forPlan ? 'Ćwiczenia, których nie zrobisz w danej siłowni, zamienią się automatycznie.' : '', '', body);
@@ -361,6 +363,7 @@ $('#sheetRoot').addEventListener('click', ev => {
   if (a === 'finish-yes') { closeSheet(); finish(); return; }
   if (a === 'discard-ask') { openPanel('finish', {mode: 'discard'}); return; }
   if (a === 'discard-yes') { closeSheet(); discard(); return; }
+  if (a === 'pick-all') { UI.sheet.all = b.dataset.v === '1'; renderSheet(false); return; }
   if (a === 'day-go') { UI.sheet.wd = +b.dataset.v; UI.peOpen = null; renderSheet(false); return; }
   if (a === 'pick-open') { openPanel('pick', {target: b.dataset.target, d: +b.dataset.d, q: '', wd: UI.sheet.type === 'day' ? UI.sheet.wd : null}); return; }
   if (a === 'pick-add') { const sh = UI.sheet; closeSheet(); addExercise(sh.target, b.dataset.id, sh.d); if (sh.wd != null) openPanel('day', {wd: sh.wd}); return; }
@@ -517,7 +520,7 @@ function viewSession() {
     (UI.wuOpen ? '<ul><li>3–5 min lekkiego cardio: rower, orbitrek, szybki marsz</li><li>Krążenia ramion i bioder, wymachy nóg po 10</li><li>10 przysiadów i 10 pompek bez obciążenia</li><li>Przed ciężkim ćwiczeniem zrób serie rozgrzewkowe pokazane przy nim</li></ul>' : '') + '</section>';
   h += '<section class="player" id="player"><div class="pl-head"><button class="pl-count" data-act="list" aria-haspopup="dialog">Ćwiczenie ' + (i + 1) + ' z ' + n + ' ▾</button><button class="btn sm ghost" data-act="tech" data-i="' + i + '">Zamień</button></div>' +
     '<h2 class="pl-name">' + ex.n + '</h2><div class="row"><span class="chip">' + q.sets.length + ' × ' + range(ex, q) + '</span><span class="chip">przerwa ' + mmss(q.rest) + '</span><span class="chip m">' + KINDN[ex.kind] + '</span>' + (ex.uni ? '<span class="chip m">na stronę</span>' : '') + '</div>' +
-    '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '"><span class="inl" id="inlFig" data-id="' + q.id + '">' + figSVG(q.id, thumbK(ex), FC, tightBox(q.id), {detail: true}) + '</span><span class="inl-cap"><span id="inlPhase">Technika</span><b>Technika i błędy ›</b></span></button>' +
+    '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '">' + (ex.fig ? '<span class="inl" id="inlFig" data-id="' + q.id + '">' + figSVG(q.id, thumbK(ex), FC, tightBox(q.id), {detail: true}) + '</span>' : '<span class="inl photo"><img src="' + photoSrc(ex, 1) + '" alt=""></span>') + '<span class="inl-cap"><span id="inlPhase">Technika</span><b>Technika i błędy ›</b></span></button>' +
     '<p class="hint' + (q.up ? ' up' : q.dl ? ' dl' : '') + '">' + (q.up ? '<span class="mono">↑</span>' : '') + '<span>' + q.hint + '</span></p>';
   if (ex.kind === 'bar' && !q.dl) { const rp = ramp(q.sets[0].kg); if (rp.length) h += '<div class="ramp"><span class="eyebrow">Rozgrzewka:</span>' + rp.map((r, j) => '<button data-act="wu" data-i="' + i + '" data-j="' + j + '" aria-pressed="' + !!(q.wu || [])[j] + '">' + fmt(r[0]) + '×' + r[1] + '</button>').join('') + '</div>'; }
   h += '<div class="setpills" role="group" aria-label="Serie">' + q.sets.map((x, j) => '<button class="sp' + (x.done ? ' done' : '') + (j === k ? ' sel' : '') + '" data-act="sel" data-i="' + i + '" data-k="' + j + '" aria-label="Seria ' + (j + 1) + (x.done ? ', zrobiona' : '') + '"><small>Seria ' + (j + 1) + '</small><span>' + (x.kg == null ? (x.reps ?? q.lo) + ' powt.' : fmt(x.kg) + '×' + (x.reps ?? '–')) + '</span></button>').join('') +
@@ -551,16 +554,22 @@ function viewRecovery() {
 }
 function viewAtlas() {
   const q = UI.aq.trim().toLowerCase();
-  const all = Object.values(EX).filter(usable);
-  const list = all.filter(e => (UI.am === 'all' || primary(e).includes(UI.am)) && (!UI.mine || canDo(e, equip())) && (!q || (e.n + ' ' + e.en + ' ' + Object.keys(e.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
-  let h = '<div class="atl-head"><input class="search" id="aq" type="search" placeholder="Szukaj" value="' + esc(UI.aq) + '" aria-label="Szukaj ćwiczenia">' +
-    '<div class="filters" role="group" aria-label="Partia mięśni"><button class="pill" data-act="mine" aria-pressed="' + UI.mine + '">Mój sprzęt</button>' + [['all', 'Wszystkie']].concat(TRAINABLE.map(m => [m, MUSCLES[m]])).map(([k, l]) => '<button class="pill" data-act="am" data-v="' + k + '" aria-pressed="' + (UI.am === k) + '">' + l + '</button>').join('') + '</div></div><div class="stack">';
-  h += '<p class="muted small">' + list.length + ' ćwiczeń. Tylko takie, przy których badania pokazały przyrost mięśni: <span class="evb A">A</span> samo ćwiczenie, <span class="evb B">B</span> bliski wariant lub program.</p>';
+  const muscles = UI.all ? TRAINABLE.concat('abs') : TRAINABLE;
+  if (!muscles.includes(UI.am)) UI.am = 'all';
+  const pool = Object.values(EX).filter(e => listable(e, UI.all));
+  const list = pool.filter(e => (UI.am === 'all' || primary(e).includes(UI.am)) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())) && (!q || (e.n + ' ' + e.en + ' ' + Object.keys(e.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
+  const nEv = Object.values(EX).filter(usable).length;
+  let h = '<div class="atl-head"><div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Zakres"><button data-act="aall" data-v="0" aria-pressed="' + !UI.all + '">Z badaniami · ' + nEv + '</button><button data-act="aall" data-v="1" aria-pressed="' + UI.all + '">Wszystkie · ' + Object.keys(EX).length + '</button></div>' +
+    '<input class="search" id="aq" type="search" placeholder="Szukaj (po polsku lub angielsku)" value="' + esc(UI.aq) + '" aria-label="Szukaj ćwiczenia">' +
+    '<div class="filters" role="group" aria-label="Partia mięśni">' + [['all', 'Każda partia']].concat(muscles.map(m => [m, MUSCLES[m]])).map(([k, l]) => '<button class="pill" data-act="am" data-v="' + k + '" aria-pressed="' + (UI.am === k) + '">' + l + '</button>').join('') + '</div>' +
+    '<div class="filters" role="group" aria-label="Sprzęt"><button class="pill tog" data-act="mine" aria-pressed="' + UI.mine + '">' + (UI.mine ? '✓ ' : '') + 'Mój sprzęt</button>' + [['all', 'Każdy sprzęt']].concat(KINDS).map(([k, l]) => '<button class="pill" data-act="ak" data-v="' + k + '" aria-pressed="' + (UI.ak === k) + '">' + l + '</button>').join('') + '</div></div><div class="stack">';
+  h += '<p class="muted small">' + exWord(list.length) + '. <span class="evb A">A</span> badanie przyrostu z tym ćwiczeniem, <span class="evb B">B</span> bliski wariant lub program' + (UI.all ? ', <span class="evb N">–</span> bez badań (zdjęcia i opis z free-exercise-db)' : '') + '.</p>';
   if (!list.length) h += '<p class="muted">Nic nie pasuje.</p><button class="btn" data-act="af-reset">Wyczyść filtry</button>';
-  const groups = UI.am === 'all' ? TRAINABLE : [UI.am];
+  const groups = UI.am === 'all' ? muscles : [UI.am];
+  const order = e => (e.ev ? (e.ev.l === 'A' ? 0 : 1) : 2);
   groups.forEach(m => {
-    const g = list.filter(e => (UI.am === 'all' ? primary(e)[0] === m : true)); if (!g.length) return;
-    h += '<section class="stack" style="gap:8px"><div class="sec-h">' + MUSCLES[m] + '</div><ul class="list">' + g.map(e => '<li><button class="lrow' + (S.settings.exclude.includes(e.id) ? ' off' : '') + '" data-act="sheet-open" data-id="' + e.id + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + e.n + '</b><span>' + KINDN[e.kind] + ' · ' + primary(e).map(k => MUSCLES[k]).join(', ') + '</span></span><span class="evb ' + e.ev.l + '" title="' + EV_NAME[e.ev.l] + '">' + e.ev.l + '</span></button></li>').join('') + '</ul></section>';
+    const g = list.filter(e => (UI.am === 'all' ? primary(e)[0] === m : true)).sort((a, b) => order(a) - order(b)); if (!g.length) return;
+    h += '<section class="stack" style="gap:8px"><div class="sec-h">' + MUSCLES[m] + ' <span class="muted small">' + g.length + '</span></div><ul class="list">' + g.map(e => '<li><button class="lrow' + (S.settings.exclude.includes(e.id) ? ' off' : '') + '" data-act="sheet-open" data-id="' + e.id + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + e.n + '</b><span>' + KINDN[e.kind] + ' · ' + primary(e).map(k => MUSCLES[k]).join(', ') + '</span></span>' + (e.ev ? '<span class="evb ' + e.ev.l + '" title="' + EV_NAME[e.ev.l] + '">' + e.ev.l + '</span>' : '<span class="evb N" title="Bez badań przyrostu">–</span>') + '</button></li>').join('') + '</ul></section>';
   });
   return h + '</div>';
 }
@@ -628,7 +637,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Twój Trener · wersja 1.5</p>';
+  h += '<p class="muted small center">Twój Trener · wersja 1.6</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -864,8 +873,10 @@ function onAct(ev) {
     case 'wipe-no': UI.wipe = false; render(); break;
     case 'wipe-yes': { const fresh = defaultState(); Object.keys(S).forEach(k => delete S[k]); Object.assign(S, fresh); S.settings.cycleStart = weekStart().toISOString(); UI.wipe = false; persistNow(); stopRest(); render(); toast('Dane usunięte'); break; }
     case 'am': UI.am = v; render(); break;
+    case 'ak': UI.ak = v; render(); break;
+    case 'aall': UI.all = v === '1'; render(); window.scrollTo(0, 0); break;
     case 'mine': UI.mine = !UI.mine; render(); break;
-    case 'af-reset': UI.am = 'all'; UI.aq = ''; UI.mine = false; render(); break;
+    case 'af-reset': UI.am = 'all'; UI.ak = 'all'; UI.aq = ''; UI.mine = false; render(); break;
     case 'openw': UI.openW = UI.openW === b.dataset.id ? null : b.dataset.id; UI.delW = null; render(); break;
     case 'delw': UI.delW = b.dataset.id; render(); break;
     case 'delw-no': UI.delW = null; render(); break;

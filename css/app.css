@@ -629,3 +629,9 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .wdpick button.has::after{content:"";position:absolute;left:50%;bottom:4px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--accent)}
 .wdpick button[aria-selected="true"]{background:var(--accent);color:#fff}
 .wdpick button[aria-selected="true"].has::after{background:#fff}
+.evb.N{background:var(--sunk);color:var(--muted)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;background:#fff}
+.inl.photo{display:block;background:#fff}
+.inl.photo img{width:100%;height:100%;object-fit:contain;display:block}
+.sec-h .small{font-weight:400}
+.pill.tog[aria-pressed="true"]{background:var(--ok-soft);color:var(--ok)}

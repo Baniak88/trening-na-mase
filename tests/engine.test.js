@@ -14,7 +14,8 @@ const sets = (n, kg, reps) => Array.from({length: n}, () => ({kg, reps}));
 
 test('every exercise has a figure, needs and alternatives that exist', () => {
   for (const [id, ex] of Object.entries(EX)) {
-    assert.ok(ex.fig && ex.fig.A && ex.fig.B, id + ' figure');
+    if (ex.lib) assert.ok(ex.img && ex.cues.length && ex.n && Object.values(ex.m).includes(1), id + ' library entry');
+    else assert.ok(ex.fig && ex.fig.A && ex.fig.B, id + ' figure');
     assert.ok(Array.isArray(ex.needs), id + ' needs');
     for (const a of ex.alt) assert.ok(EX[a], id + ' alt ' + a);
   }
@@ -153,4 +154,16 @@ test('every muscle group has a wide choice of evidence-backed exercises', async 
     assert.ok(e.fig.A && e.fig.B && e.cues.length && e.err.length, e.id + ' content');
     for (const a of e.alt) assert.ok(EX[a], e.id + ' alt ' + a);
   }
+});
+
+test('library exercises are listed but never picked automatically', async () => {
+  const {usable, listable, photoSrc} = await import('../js/data/catalog.js');
+  const {fillDay} = await import('../js/engine/planner.js');
+  const lib = Object.values(EX).filter(e => e.lib);
+  assert.ok(lib.length > 400, 'library ' + lib.length);
+  assert.ok(lib.every(e => !usable(e) && listable(e, true) && !listable(e, false)));
+  assert.match(photoSrc(lib[0], 1), /^https:\/\/raw\.githubusercontent\.com\/.+\/1\.jpg$/);
+  const g = generate({workouts: [], equipment: [...GYM, 'kettlebell', 'bands'], duration: 90, focus: 'full', seed: 3, now: NOW});
+  assert.ok(g.items.every(it => !EX[it.id].lib));
+  assert.ok(fillDay(['chest', 'back'], {equipment: [...GYM, 'kettlebell', 'bands']}).every(it => !EX[it.id].lib));
 });
