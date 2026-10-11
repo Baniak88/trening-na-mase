@@ -44,3 +44,23 @@ test('migrate drops unknown exercises in substitutions and fixes profile', () =>
   assert.deepEqual(s.settings.subs, {});
   assert.equal(s.settings.profile, 'gym');
 });
+
+test('custom plans survive export, import and cleaning', () => {
+  const S = defaultState();
+  S.customPlans.push({id: 'c1', name: 'Mój PPL', days: [{name: 'Push', ex: [{id: 'bench', sets: 4, lo: 6, hi: 10, rest: 150}, {id: 'nope', sets: 3, lo: 8, hi: 12, rest: 90}]}, {name: '', ex: [{id: 'curl', sets: 99, lo: 12, hi: 8, rest: 5}]}]});
+  S.settings.plan = 'c1';
+  const T = defaultState();
+  importData(T, exportJSON(S));
+  assert.equal(T.customPlans.length, 1);
+  const p = T.customPlans[0];
+  assert.equal(p.days[0].ex.length, 1, 'unknown exercise dropped');
+  assert.equal(p.days[1].name, 'Dzień 2');
+  assert.deepEqual(p.days[1].ex[0], {id: 'curl', sets: 10, lo: 12, hi: 12, rest: 15});
+  assert.equal(T.settings.plan, 'c1', 'selected custom plan kept');
+  importData(T, exportJSON(S));
+  assert.equal(T.customPlans.length, 1, 'no duplicate plans');
+});
+
+test('missing custom plan falls back to a built-in plan', () => {
+  assert.equal(migrate({settings: {plan: 'c_gone'}}).settings.plan, 'fbw3');
+});

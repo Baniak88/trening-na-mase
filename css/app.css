@@ -466,3 +466,27 @@ select,.field input{height:44px;border-radius:10px;border:1px solid var(--line);
 .phtag{position:absolute;left:10px;bottom:10px;padding:3px 10px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font:600 12px var(--body)}
 @keyframes phx{0%,38%{opacity:0}50%,88%{opacity:1}100%{opacity:0}}
 @keyframes phx0{0%,38%{opacity:1}50%,88%{opacity:0}100%{opacity:1}}
+/* ---- v1.3: plan editor ---- */
+.plans .plan-new{border-style:dashed;background:transparent;justify-content:center}
+.plans .plan-new b{color:var(--accent)}
+.plans button.own span:last-child{color:var(--accent)}
+.pe-in{height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:600 16px var(--body);padding:0 12px;width:100%;min-width:0}
+.field span{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.pe-dayhead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.pe-dayname{font:800 20px var(--display);text-transform:uppercase;letter-spacing:.02em}
+.pe-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.pe-ex{border:1px solid var(--line);border-radius:12px;padding:6px}
+.pe-ex.open{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pe-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center}
+.pe-row .thumb{width:64px}
+.pe-main{display:flex;flex-direction:column;gap:2px;border:0;background:none;padding:4px 0;text-align:left;min-width:0;color:inherit}
+.pe-main b{font-size:14px;line-height:1.25}
+.pe-main .mono{font-size:12px;color:var(--muted)}
+.pe-ord{display:flex;flex-direction:column;gap:4px}
+.pe-ord button{width:36px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-size:11px;color:var(--muted)}
+.pe-edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 4px 4px}
+.pe-edit .linkbtn{grid-column:1/-1;justify-self:start}
+.pe-stp span{display:block;font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.pe-stp .ctl{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.pe-stp .ctl button{height:42px;border:0;background:transparent;font:600 20px var(--mono);color:var(--accent)}
+.pe-stp .ctl b{text-align:center;font-size:16px}

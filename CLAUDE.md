@@ -1,4 +1,4 @@
-# Trening na masę
+# Twój Trener (repo trening-na-mase)
 
 PWA bez kroku budowania: czysty HTML, CSS i moduły ES, hostowane na GitHub Pages z gałęzi `main`.
 

@@ -20,10 +20,25 @@ export function defaultState() {
       bar: 20, bw: 80, subs: {}, exclude: [], cycleStart: null, welcomed: false, updatedAt: 0,
     },
     profiles: defaultProfiles(),
+    customPlans: [],
     workouts: [],
     draft: null,
     today: null,
   };
+}
+
+/** Clean a user-built plan: known exercises only, sane numbers. Returns null when nothing usable is left. */
+export function cleanPlan(p) {
+  if (!p || typeof p !== 'object' || !Array.isArray(p.days)) return null;
+  const num = (v, lo, hi, d) => (Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.round(+v))) : d);
+  const days = p.days.slice(0, 7).map((d, i) => ({
+    name: String((d && d.name) || 'Dzień ' + (i + 1)).slice(0, 24),
+    ex: (d && Array.isArray(d.ex) ? d.ex : []).filter(e => e && EX[e.id]).slice(0, 15).map(e => {
+      const lo = num(e.lo, 1, 100, 8);
+      return {id: e.id, sets: num(e.sets, 1, 10, 3), lo, hi: Math.max(lo, num(e.hi, 1, 100, 12)), rest: num(e.rest, 15, 600, 90)};
+    }),
+  }));
+  return {id: String(p.id || 'c' + Date.now().toString(36)), name: String(p.name || 'Mój plan').slice(0, 30), days};
 }
 
 const validWorkout = w => w && typeof w.id === 'string' && w.date && Array.isArray(w.ex);
@@ -40,7 +55,8 @@ export function migrate(d) {
     if (o.plan === 'fbw') s.settings.plan = 'fbw3';
     if (o.plan === 'ul') s.settings.plan = 'ul4';
   }
-  if (!PLANS[s.settings.plan]) s.settings.plan = 'fbw3';
+  if (Array.isArray(d.customPlans)) s.customPlans = d.customPlans.map(cleanPlan).filter(Boolean);
+  if (!PLANS[s.settings.plan] && !s.customPlans.some(p => p.id === s.settings.plan)) s.settings.plan = 'fbw3';
   for (const k in s.settings.subs) if (!EX[s.settings.subs[k]]) delete s.settings.subs[k];
   if (!['auto', 'plan'].includes(s.settings.mode)) s.settings.mode = 'auto';
   if (Array.isArray(d.profiles) && d.profiles.length) {
@@ -79,7 +95,7 @@ export function persist() {
 }
 
 export function exportJSON(S) {
-  return JSON.stringify({app: 'trening-na-mase', v: 1, exportedAt: new Date().toISOString(), settings: S.settings, profiles: S.profiles, workouts: S.workouts}, null, 1);
+  return JSON.stringify({app: 'trening-na-mase', v: 1, exportedAt: new Date().toISOString(), settings: S.settings, profiles: S.profiles, customPlans: S.customPlans, workouts: S.workouts}, null, 1);
 }
 
 /**
@@ -100,6 +116,8 @@ export function importData(S, text) {
     if (Array.isArray(d.profiles)) S.profiles = incoming.profiles;
     else S.settings.profile = keepProfile;
   }
+  const havePlans = new Set((S.customPlans || []).map(p => p.id));
+  S.customPlans = (S.customPlans || []).concat(incoming.customPlans.filter(p => !havePlans.has(p.id)));
   S.workouts.push(...fresh);
   S.workouts.sort((a, b) => +new Date(a.date) - +new Date(b.date));
   return {added: fresh.length, total: S.workouts.length};

@@ -1,6 +1,6 @@
 {
-  "name": "Trening na masę",
-  "short_name": "Trening",
+  "name": "Twój Trener",
+  "short_name": "Twój Trener",
   "description": "Trening generowany z regeneracji mięśni, 50 ćwiczeń z animacją techniki, progresja ciężaru i postępy.",
   "lang": "pl",
   "start_url": "./",

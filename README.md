@@ -1,4 +1,6 @@
-# Trening na masę
+# Twój Trener
+
+Aplikacja treningowa (repozytorium `trening-na-mase`).
 
 Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na każdy dzień układa się sam: z regeneracji mięśni, sprzętu, który masz pod ręką, i czasu, jakim dysponujesz. Ciężary podpowiada z Twojej historii.
 
@@ -15,6 +17,7 @@ Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na ka�
 - **Progresja:** podwójna progresja (najpierw powtórzenia, potem ciężar), rekordy, szacowany 1RM, wykresy postępów.
 - **Cykl 6 tygodni:** wysiłek rośnie co tydzień, 6. tydzień jest lżejszy.
 - **Stały plan:** zamiast generatora możesz wybrać plan FBW 2×, FBW 3×, Góra/Dół 4× albo Góra/Dół + PPL 5×.
+- **Własne plany:** zbuduj plan od zera albo skopiuj gotowy i dopasuj: dni, ćwiczenia, serie, zakres powtórzeń, przerwy, kolejność. Podgląd pokazuje, ile serii tygodniowo dostaje każda partia.
 - **Działa bez internetu** i instaluje się jak zwykła aplikacja. Dane zostają w telefonie; kopię zapiszesz do pliku w Ustawieniach.
 
 ## Aplikacja na Androida (APK)
