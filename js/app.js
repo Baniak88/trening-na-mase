@@ -50,7 +50,7 @@ function headLine(ex) {
 /* ---------- State ---------- */
 const S = load();
 if (!S.settings.cycleStart) S.settings.cycleStart = weekStart().toISOString();
-const UI = {stack: [], permSwap: false, tab: 'train', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
+const UI = {stack: [], permSwap: false, tab: S.draft ? 'train' : 'home', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
   aq: '', am: 'all', ah: 'all', ak: 'all', all: false, mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
 let saveT = null;
 function persistNow() { clearTimeout(saveT); save(S); }
@@ -515,18 +515,65 @@ function daySheet() {
   } else h += '<p class="muted small">Zaznacz jedną lub kilka partii. Dobiorę ćwiczenia, przy których badania pokazały przyrost mięśni. Bez zaznaczenia to dzień wolny.</p>';
   return sheetFrame(WEEKDAYS[wd], 'Plan tygodnia', d ? exWord(d.ex.length) + ' · ok. ' + estMin(d.ex, false) + ' min' : 'Odpoczynek', '', h);
 }
+/* ---------- Start: menu with today's summary ---------- */
+const ICON = {
+  train: '<path d="M6 7v10M18 7v10M3 9.5v5M21 9.5v5M6 12h12"/>',
+  plan: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  atlas: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  recovery: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  progress: '<path d="M4 19h16M5 15l4-4 4 3 6-7"/>',
+  know: '<path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h9"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+};
+const icon = (k, color) => '<span class="ticon" style="background:' + color + '"><svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[k] + '</svg></span>';
+function viewStart() {
+  const st = S.settings; const t = S.draft ? null : ensureToday(); const rec = recovery(S.workouts);
+  const ready = TRAINABLE.filter(m => status(rec[m].pct) === 'ready').length;
+  const ws = weekStart(); const thisWeek = S.workouts.filter(w => new Date(w.date) >= ws).length;
+  const c = weekPlanObj(); const perWeek = c && c.days.length ? c.days.length : 0;
+  const today = new Date().toLocaleDateString('pl-PL', {weekday: 'long', day: 'numeric', month: 'long'});
+  let h = '<div class="stack"><p class="start-date">' + today.charAt(0).toUpperCase() + today.slice(1) + '</p>';
+  if (!st.welcomed) h += '<section class="card welcome"><b>Witaj w Twoim Trenerze</b><p class="small">Zacznij od planu tygodnia: wybierz dni i partie mięśni, a ćwiczenia dobiorą się same. Proponuję tylko ćwiczenia, przy których badania pokazały przyrost mięśni.</p><div class="row"><button class="btn sm primary" data-act="day-open" data-v="' + weekdayOf() + '">Zaplanuj tydzień</button><button class="btn sm ghost" data-act="welcomed">Później</button></div></section>';
+  if (S.draft) {
+    const [dn, dt] = counts(S.draft);
+    h += '<section class="card hero"><div class="eyebrow">Trening w toku</div><h2>' + esc(S.draft.title || 'Trening') + '</h2><p class="muted">' + dn + ' z ' + dt + ' serii</p><button class="btn primary big" data-act="back-train">Wróć do treningu</button></section>';
+  } else if (t.rest) {
+    const n = t.next ? plan().days[t.next.idx] : null;
+    h += '<section class="card hero"><div class="eyebrow">Dziś</div><h2>Dzień wolny</h2><p class="muted">' + (n ? 'Następny trening: ' + WEEKDAYS[n.wd].toLowerCase() + ', ' + esc(n.name) + '.' : 'Mięśnie rosną, kiedy odpoczywasz.') + '</p><button class="btn big" data-act="go" data-tab="plan">Zobacz plan tygodnia</button></section>';
+  } else {
+    h += '<section class="card hero"><div class="eyebrow">Dziś</div><h2>' + esc(t.title) + '</h2><p class="muted">' + exWord(t.items.length) + ' · ok. ' + t.estMin + ' min</p><div class="hero-btns"><button class="btn primary big" data-act="start-go"' + (t.items.length ? '' : ' disabled') + '>Zacznij trening</button><button class="btn big" data-act="go" data-tab="train">Podgląd</button></div></section>';
+  }
+  const tiles = [
+    ['train', 'Trening na dziś', S.draft ? 'w toku' : t.rest ? 'dziś wolne' : exWord(t.items.length), '#007AFF', 'go', 'train'],
+    ['plan', 'Plan tygodnia', perWeek ? perWeek + ' ' + daysWord(perWeek) + ' w tygodniu' : 'ustaw dni i partie', '#34C759', 'go', 'plan'],
+    ['atlas', 'Ćwiczenia', Object.values(EX).filter(usable).length + ' z badaniami', '#FF9500', 'go', 'atlas'],
+    ['recovery', 'Regeneracja', 'gotowe ' + ready + ' z ' + TRAINABLE.length + ' partii', '#FF3B30', 'go', 'recovery'],
+    ['progress', 'Postępy', thisWeek + ' w tym tygodniu', '#AF52DE', 'go', 'progress'],
+    ['know', 'Wiedza', 'zasady i badania', '#5856D6', 'go-know', ''],
+  ];
+  h += '<div class="tiles">' + tiles.map(([k, l, sub, col, act, tab]) => '<button class="tile" data-act="' + act + '"' + (tab ? ' data-tab="' + tab + '"' : '') + '>' + icon(k, col) + '<b>' + l + '</b><span>' + sub + '</span></button>').join('') + '</div>';
+  h += '<ul class="list"><li><button class="lrow" data-act="go-settings">' + icon('settings', '#8E8E93') + '<span class="lmain"><b>Ustawienia</b><span>Siłownie i sprzęt, gotowe plany, cykl, kopia danych</span></span><span class="chev">›</span></button></li></ul>';
+  return h + '</div>';
+}
+function viewPlanTab() {
+  const c = weekPlanObj();
+  let h = '<div class="stack">' + weekList();
+  if (c && c.days.length) h += planVolume(c);
+  h += '<ul class="list"><li><button class="lrow" data-act="go-settings"><span class="lmain"><b>Gotowe plany i tryb automatyczny</b><span>FBW, góra/dół, PPL albo dobór według regeneracji</span></span><span class="chev">›</span></button></li></ul>';
+  return h + '</div>';
+}
+const planLink = () => '<ul class="list"><li><button class="lrow" data-act="go" data-tab="plan"><span class="lmain"><b>Plan tygodnia</b><span>Dni, partie mięśni i ćwiczenia</span></span><span class="chev">›</span></button></li></ul>';
 function viewHome() {
   const t = ensureToday(); const st = S.settings; const wk = cycleWeek(); const cy = CYCLE[wk]; const p = plan();
   const weekPlan = t.mode === 'plan' && p.week;
   let h = '<div class="stack">';
-  if (!st.welcomed) h += '<section class="card welcome"><b>Witaj w Twoim Trenerze</b><p class="small">Zaplanuj tydzień: wybierz dni i partie mięśni, a ćwiczenia dobiorą się same. Proponuję tylko ćwiczenia, przy których badania pokazały przyrost mięśni. Ciężary podpowiadam z Twojej historii.</p><div class="row"><button class="btn sm primary" data-act="day-open" data-v="' + weekdayOf() + '">Zaplanuj tydzień</button><button class="btn sm ghost" data-act="welcomed">Później</button></div></section>';
   if (UI.summary) { const w = UI.summary; h += '<section class="card summary"><h3>Trening zapisany</h3><p>' + esc(w.dayName) + ' · ' + setsWord(w.ex.reduce((a, q) => a + q.sets.length, 0)) + ' · ' + fmt(Math.round(volume(w))) + ' kg</p>' + (w.prs.length ? '<div class="row">' + w.prs.map(q => '<span class="chip pr">Rekord: ' + EX[q].n + '</span>').join('') + '</div>' : '') + '</section>'; }
   if (t.rest) {
     const n = t.next ? p.days[t.next.idx] : null;
     const trained = S.workouts.some(w => sameDay(w.date));
     h += '<section class="card today"><div class="eyebrow">' + WEEKDAYS[t.wd] + '</div><h2>Dzień wolny</h2><p class="muted">' + (trained ? 'Dziś już trenowałeś.' : 'Mięśnie rosną, kiedy odpoczywasz.') + (n ? ' Następny trening: <b>' + WEEKDAYS[n.wd].toLowerCase() + '</b>, ' + esc(n.name) + '.' : '') + '</p>' +
       (n && !trained ? '<button class="btn wide" data-act="set-pick" data-v="' + t.next.idx + '">Trenuj dziś: ' + esc(n.name) + '</button>' : '') + '</section>';
-    h += weekList();
+    h += planLink();
     return h + '</div>';
   }
   const doneToday = weekPlan && S.workouts.some(w => sameDay(w.date) && w.plan === st.plan && w.day === t.day);
@@ -560,7 +607,7 @@ function viewHome() {
     return '<li><button class="lrow" data-act="today-ex" data-id="' + it.id + '" data-idx="' + i + '"><span class="thumb">' + thumb(it.id) + '</span><span class="lmain"><b>' + ex.n + '</b><span>' + n + ' × ' + range(ex, it) + (tgt ? ' · <em class="' + (sg.up ? 'up' : '') + '">' + (sg.up ? '↑ ' : '') + tgt + '</em>' : '') + '</span>' + (note ? '<span class="sub-note">' + esc(note) + '</span>' : '') + '</span><span class="chev" aria-hidden="true">›</span></button></li>';
   }).join('') + '</ul>' + (t.items.length ? '' : '<p class="muted card">Brak ćwiczeń dla tego sprzętu. Zmień siłownię albo partie w planie.</p>') +
     '<div class="row today-actions">' + (t.mode === 'auto' ? '<button class="btn sm" data-act="shuffle">↻ Inne ćwiczenia</button>' : '') + '<button class="btn sm ghost" data-act="pick-open" data-target="today">+ Dodaj ćwiczenie</button></div></section>';
-  h += weekList();
+  h += planLink();
   return h + '</div>';
 }
 function goEx(i) { const d = S.draft; if (!d) return; if (i >= d.ex.length) { openPanel('finish', {mode: 'finish'}); return; } i = Math.max(0, i); UI.cur = i; UI.sel = null; INL.t = 0; render(); window.scrollTo({top: 0, behavior: REDUCED ? 'auto' : 'smooth'}); }
@@ -690,7 +737,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Twój Trener · wersja 1.7</p>';
+  h += '<p class="muted small center">Twój Trener · wersja 1.8</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -786,7 +833,7 @@ function viewKnow() {
 }
 
 /* ---------- Shell: app bar, banner, render ---------- */
-const TITLES = {train: 'Trening', recovery: 'Regeneracja', atlas: 'Ćwiczenia', progress: 'Postępy'};
+const TITLES = {home: 'Twój Trener', train: 'Trening', plan: 'Plan tygodnia', recovery: 'Regeneracja', atlas: 'Ćwiczenia', progress: 'Postępy'};
 const GEAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
 function renderBar() {
   const sess = UI.tab === 'train' && !UI.sub && S.draft; let left, right = '', sub = '';
@@ -797,6 +844,8 @@ function renderBar() {
     sub = '<div class="steps-strip" role="group" aria-label="Ćwiczenia w treningu">' + d.ex.map((q, i) => '<button class="dot' + (exDone(q) ? ' done' : '') + (i === cur ? ' cur' : '') + '" data-act="go-ex" data-i="' + i + '" aria-label="' + (i + 1) + '. ' + EX[q.id].n + (exDone(q) ? ', zrobione' : '') + '"' + (i === cur ? ' aria-current="step"' : '') + '>' + (exDone(q) ? '✓' : i + 1) + '</button>').join('') + '</div><div class="progress thin" aria-label="' + c + ' z ' + tt + ' serii"><b style="width:' + (tt ? c / tt * 100 : 0) + '%"></b></div>';
   } else if (UI.sub) {
     left = '<button class="ab-back" data-act="back" aria-label="Wróć">‹</button><span class="ab-title">' + (UI.sub === 'settings' ? 'Ustawienia' : UI.sub === 'planedit' ? 'Twój plan' : 'Wiedza') + '</span>';
+  } else if (UI.tab === 'recovery') {
+    left = '<button class="ab-back" data-act="go" data-tab="home" aria-label="Wróć">‹</button><span class="ab-title">' + TITLES[UI.tab] + '</span>';
   } else {
     left = '<span class="ab-title">' + TITLES[UI.tab] + '</span>';
     right = '<button class="ab-icon" data-act="go-settings" aria-label="Ustawienia">' + GEAR + '</button>';
@@ -804,7 +853,7 @@ function renderBar() {
   $('#abLeft').innerHTML = left; $('#abRight').innerHTML = right; $('#abSub').innerHTML = sub; $('#abSub').hidden = !sub;
 }
 function renderBanner() {
-  const b = $('#sessBanner'); const show = !!S.draft && (UI.tab !== 'train' || !!UI.sub); b.hidden = !show;
+  const b = $('#sessBanner'); const show = !!S.draft && ((UI.tab !== 'train' && UI.tab !== 'home') || !!UI.sub); b.hidden = !show;
   if (show) { const d = S.draft; const [c, t] = counts(d); b.innerHTML = '<button class="bn" data-act="back-train"><span><b>Trening w toku</b> · ' + esc(d.title || '') + ' · ' + c + '/' + t + ' serii · <span class="mono" id="bnTime"></span></span><span>Wróć ›</span></button>'; }
 }
 function render() {
@@ -814,7 +863,7 @@ function render() {
   if (UI.sub === 'settings') v = viewSettings();
   else if (UI.sub === 'know') v = viewKnow();
   else if (UI.sub === 'planedit') v = viewPlanEdit();
-  else v = UI.tab === 'train' ? (S.draft ? viewSession() : viewHome()) : {recovery: viewRecovery, atlas: viewAtlas, progress: viewProgress}[UI.tab]();
+  else v = UI.tab === 'train' ? (S.draft ? viewSession() : viewHome()) : {home: viewStart, plan: viewPlanTab, recovery: viewRecovery, atlas: viewAtlas, progress: viewProgress}[UI.tab]();
   $('#view').innerHTML = v;
   renderBanner(); tick(); kick();
 }
@@ -832,6 +881,7 @@ function onAct(ev) {
   const b = ev.target.closest('[data-act]'); if (!b) return; const a = b.dataset.act; const i = +b.dataset.i; const d = S.draft; const v = b.dataset.v;
   switch (a) {
     case 'start': startWorkout(); break;
+    case 'start-go': UI.tab = 'train'; UI.sub = null; startWorkout(); break;
     case 'welcomed': setting('welcomed', true); render(); break;
     case 'cfg': UI.cfgOpen = !UI.cfgOpen; render(); break;
     case 'set-profile': setting('profile', v); render(); toast('Siłownia: ' + profile().name); break;
@@ -996,7 +1046,7 @@ window.tnmBack = () => {
   if (UI.sheet) { closeSheet(); return true; }
   if (UI.sub) { subBack(); return true; }
   if (UI.cfgOpen) { UI.cfgOpen = false; render(); return true; }
-  if (UI.tab !== 'train') { UI.tab = 'train'; render(); window.scrollTo(0, 0); return true; }
+  if (UI.tab !== 'home') { UI.tab = 'home'; render(); window.scrollTo(0, 0); return true; }
   return false;
 };
 window.tnmSave = persistNow;
