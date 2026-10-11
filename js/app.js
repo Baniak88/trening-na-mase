@@ -479,7 +479,7 @@ function viewHome() {
   const load = {}; t.items.forEach(it => { const m = EX[it.id].m; for (const k in m) load[k] = (load[k] || 0) + m[k] * it.sets; });
   const eyebrow = weekPlan ? (t.wd === weekdayOf() ? 'Dziś · ' : 'Wybrany dzień · ') + WEEKDAYS[t.wd] : t.mode === 'plan' ? esc(p.name) : 'Dobrane dla Ciebie';
   h += '<section class="card today"><div class="today-top"><div class="today-txt"><div class="eyebrow">' + eyebrow + '</div>' +
-    '<h2>' + esc(t.title) + '</h2><div class="today-meta">' + t.items.length + ' ćwiczeń · ok. ' + t.estMin + ' min' + (cy.deload ? ' · tydzień lżejszy' : '') + '</div>' + (doneToday ? '<div class="donebadge">✓ Zrobione dziś</div>' : '') + '</div>' +
+    '<h2>' + esc(t.title) + '</h2><div class="today-meta">' + exWord(t.items.length) + ' · ok. ' + t.estMin + ' min' + (cy.deload ? ' · tydzień lżejszy' : '') + '</div>' + (doneToday ? '<div class="donebadge">✓ Zrobione dziś</div>' : '') + '</div>' +
     '<div class="today-map">' + targetMap(load) + '</div></div>' +
     (t.light ? '<p class="notice small">Mięśnie jeszcze się regenerują. Proponuję lżejszy trening albo dzień wolny.</p>' : '') +
     (cy.deload ? '<p class="notice small">Tydzień lżejszy: połowa serii, ok. 10% mniej ciężaru.</p>' : '') +
