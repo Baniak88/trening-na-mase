@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.baniak88.trening'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'io.github.baniak88.trening'
+        minSdk 24
+        targetSdk 34
+        versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
+        versionName '1.1.' + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
+    }
+
+    // Personal-use signing key kept in the repo so every build can update the installed app.
+    signingConfigs {
+        release {
+            storeFile file('../tnm-release.p12')
+            storeType 'pkcs12'
+            storePassword 'trening-na-mase'
+            keyAlias 'tnm'
+            keyPassword 'trening-na-mase'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

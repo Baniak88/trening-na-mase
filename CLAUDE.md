@@ -10,6 +10,11 @@ PWA bez kroku budowania: czysty HTML, CSS i moduły ES, hostowane na GitHub Page
 - Nowy plik JS lub CSS dopisz do listy `APP` w `sw.js`.
 - Dane tylko w `localStorage` (klucz `tnm-v1`), zmiany schematu obsłuż w `migrate()` w `js/store.js`.
 
+## Android
+- `android/` to WebView ładujący pliki strony z assets (kopiowane w workflow `android.yml`, nie trzymamy ich w repo).
+- Most JS: `window.TnmAndroid` (saveFile, keepScreenOn, vibrate); aplikacja woła `window.tnmBack()` i `window.tnmSave()`.
+- APK ląduje na gałęzi `apk` (`trening-na-mase.apk` + `build.log`).
+
 ## Uruchomienie
 - `npm start` (lub `python3 -m http.server 8080`) i otwórz http://localhost:8080
 - `npm test` uruchamia testy algorytmu (Node 20+).

@@ -16,7 +16,16 @@ Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na ka�
 - **Stały plan:** zamiast generatora możesz wybrać plan FBW 2×, FBW 3×, Góra/Dół 4× albo Góra/Dół + PPL 5×.
 - **Działa bez internetu** i instaluje się jak zwykła aplikacja. Dane zostają w telefonie; kopię zapiszesz do pliku w Ustawieniach.
 
-## Instalacja na telefonie
+## Aplikacja na Androida (APK)
+
+Każdy push na `main` buduje plik APK w GitHub Actions (workflow `Android APK`) i publikuje go na gałęzi `apk`:
+https://github.com/Baniak88/trening-na-mase/raw/apk/trening-na-mase.apk
+
+Instalacja: pobierz plik na telefonie, otwórz go i zezwól przeglądarce lub menedżerowi plików na instalowanie aplikacji z nieznanych źródeł. Kolejne wersje instalują się na poprzedniej, dane zostają.
+
+APK to ta sama aplikacja webowa zapakowana w WebView (`android/`). Pliki strony są kopiowane do APK przy budowaniu. Klucz podpisu `android/tnm-release.p12` jest w repo, żeby każda wersja mogła zaktualizować poprzednią; to wystarcza do użytku prywatnego, ale przed publikacją w Google Play trzeba użyć osobnego, tajnego klucza.
+
+## Instalacja na telefonie (wersja w przeglądarce)
 
 1. Otwórz adres aplikacji w przeglądarce telefonu.
 2. **Android (Chrome):** menu ⋮ → „Zainstaluj aplikację” albo „Dodaj do ekranu głównego”.

@@ -21,6 +21,8 @@ const kgTxt = (ex, kg) => (ex.kind === 'bw' ? (kg ? '+' + fmt(kg) + ' kg' : 'mas
 const unitHead = ex => (ex.kind === 'bw' ? '+kg' : ex.kind === 'db' ? 'kg/hantel' : 'kg');
 const repTxt = (ex, n) => (isS(ex) ? n + ' s' : String(n));
 const range = (ex, it) => it.lo + '–' + it.hi + (isS(ex) ? ' s' : '');
+/** Native bridge when running inside the Android app (see android/). */
+const ANDROID = window.TnmAndroid || null;
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const dayStamp = (d = new Date()) => d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
 function weekStart(d = new Date()) { const q = new Date(d); q.setHours(0, 0, 0, 0); q.setDate(q.getDate() - ((q.getDay() + 6) % 7)); return q; }
@@ -153,7 +155,7 @@ const T = {end: 0, total: 0, on: false, goT: null}; let actx = null;
 function unlockAudio() { try { if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); } if (actx && actx.state === 'suspended') actx.resume(); } catch (err) { /* no audio */ } }
 function beep() {
   try { if (!actx) return; const t = actx.currentTime; [0, 0.28, 0.56].forEach((o, i) => { const os = actx.createOscillator(), g = actx.createGain(); os.frequency.value = i === 2 ? 1175 : 880; g.gain.setValueAtTime(0.0001, t + o); g.gain.exponentialRampToValueAtTime(0.35, t + o + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + o + 0.22); os.connect(g).connect(actx.destination); os.start(t + o); os.stop(t + o + 0.25); }); } catch (err) { /* no audio */ }
-  try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (err) { /* no vibration */ }
+  try { if (ANDROID) ANDROID.vibrate(500); else if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (err) { /* no vibration */ }
 }
 function startRest(sec, next) { T.total = sec; T.end = Date.now() + sec * 1000; T.on = true; clearTimeout(T.goT); $('#rest').classList.remove('go'); $('#restLbl').textContent = 'Przerwa'; $('#restNext').textContent = next || ''; $('#restNext').hidden = !next; $('#rest').hidden = false; tick(); }
 function stopRest() { T.on = false; clearTimeout(T.goT); $('#rest').hidden = true; $('#rest').classList.remove('go'); }
@@ -171,8 +173,8 @@ $('#restPlus').onclick = () => { T.end += 15000; T.total += 15; tick(); };
 $('#restSkip').onclick = stopRest;
 $('#restNext').onclick = () => { if (UI.tab !== 'train' && S.draft) { UI.tab = 'train'; UI.sub = null; render(); window.scrollTo(0, 0); } };
 let wl = null;
-async function wake() { try { if (navigator.wakeLock && !wl) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } } catch (err) { wl = null; } }
-function releaseWake() { try { wl && wl.release(); } catch (err) { /* already released */ } wl = null; }
+async function wake() { if (ANDROID) { try { ANDROID.keepScreenOn(true); } catch (err) { /* ignore */ } return; } try { if (navigator.wakeLock && !wl) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } } catch (err) { wl = null; } }
+function releaseWake() { if (ANDROID) { try { ANDROID.keepScreenOn(false); } catch (err) { /* ignore */ } return; } try { wl && wl.release(); } catch (err) { /* already released */ } wl = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (S.draft) wake(); tick(); if (!S.draft && UI.tab === 'train' && S.today && S.today.key !== todayKey()) render(); } });
 function nextLabel() {
   const d = S.draft;
@@ -711,6 +713,7 @@ $('#view').addEventListener('touchend', ev => {
 }, {passive: true});
 
 function exportFile() {
+  if (ANDROID) { ANDROID.saveFile('trening-na-mase-' + new Date().toISOString().slice(0, 10) + '.json', exportJSON(S)); return; }
   const blob = new Blob([exportJSON(S)], {type: 'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'trening-na-mase-' + new Date().toISOString().slice(0, 10) + '.json';
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -722,7 +725,7 @@ function doImport(text) {
 }
 
 /* ---------- Service worker & updates ---------- */
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+if (!ANDROID && 'serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').then(reg => {
     const offer = w => { $('#updateBar').hidden = false; $('#updateBtn').onclick = () => { persistNow(); w.postMessage('skipWaiting'); }; };
     if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
@@ -731,6 +734,16 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; location.reload(); } });
 }
+
+/* Android back button and app pause (called from MainActivity). Returns true when the app handled "back". */
+window.tnmBack = () => {
+  if (UI.sheet) { closeSheet(); return true; }
+  if (UI.sub) { UI.sub = UI.sub === 'know' && UI.fromSettings ? 'settings' : null; render(); window.scrollTo(0, 0); return true; }
+  if (UI.cfgOpen) { UI.cfgOpen = false; render(); return true; }
+  if (UI.tab !== 'train') { UI.tab = 'train'; render(); window.scrollTo(0, 0); return true; }
+  return false;
+};
+window.tnmSave = persistNow;
 
 persist();
 render();

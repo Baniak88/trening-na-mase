@@ -1,0 +1,59 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Kopiowanie aplikacji do APK
+        run: |
+          mkdir -p android/app/src/main/assets/www
+          cp -r index.html manifest.webmanifest css js icons android/app/src/main/assets/www/
+
+      - name: Budowanie APK
+        run: |
+          set -o pipefail
+          gradle -p android assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Publikacja na gałęzi apk
+        if: always()
+        run: |
+          mkdir out
+          cp android/app/build/outputs/apk/release/app-release.apk out/trening-na-mase.apk || true
+          tail -n 300 build.log > out/build.log || true
+          echo "${GITHUB_SHA} run ${GITHUB_RUN_NUMBER}" > out/VERSION.txt
+          cd out
+          git init -q
+          git checkout -q -b apk
+          git add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "APK z ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" apk
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: trening-na-mase-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
