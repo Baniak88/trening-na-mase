@@ -624,3 +624,8 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .wdname.done{background:var(--ok-fill);color:#fff}
 .hint-p{padding:0 4px}
 .sheet .mgrid{margin-bottom:4px}
+.wdpick{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;background:var(--sunk);padding:3px;border-radius:12px}
+.wdpick button{position:relative;min-height:40px;border:0;border-radius:9px;background:transparent;font-weight:600;font-size:14px;color:var(--muted)}
+.wdpick button.has::after{content:"";position:absolute;left:50%;bottom:4px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--accent)}
+.wdpick button[aria-selected="true"]{background:var(--accent);color:#fff}
+.wdpick button[aria-selected="true"].has::after{background:#fff}

@@ -361,6 +361,7 @@ $('#sheetRoot').addEventListener('click', ev => {
   if (a === 'finish-yes') { closeSheet(); finish(); return; }
   if (a === 'discard-ask') { openPanel('finish', {mode: 'discard'}); return; }
   if (a === 'discard-yes') { closeSheet(); discard(); return; }
+  if (a === 'day-go') { UI.sheet.wd = +b.dataset.v; UI.peOpen = null; renderSheet(false); return; }
   if (a === 'pick-open') { openPanel('pick', {target: b.dataset.target, d: +b.dataset.d, q: '', wd: UI.sheet.type === 'day' ? UI.sheet.wd : null}); return; }
   if (a === 'pick-add') { const sh = UI.sheet; closeSheet(); addExercise(sh.target, b.dataset.id, sh.d); if (sh.wd != null) openPanel('day', {wd: sh.wd}); return; }
   if (a.startsWith('pe-') || a === 'set-pick') { if (a === 'set-pick') closeSheet(); onAct(ev); return; }
@@ -448,7 +449,9 @@ function weekList() {
 /** Sheet for one weekday: muscle groups, then the exercises filled in for them. */
 function daySheet() {
   const wd = UI.sheet.wd; const c = weekPlanObj(); const di = c ? c.days.findIndex(x => x.wd === wd) : -1; const d = di >= 0 ? c.days[di] : null;
-  let h = '<div class="eyebrow">Partie mięśni</div><div class="mgrid" role="group" aria-label="Partie mięśni">' + TRAINABLE.map(m => '<button class="mtog" data-act="pe-mus" data-wd="' + wd + '" data-m="' + m + '" aria-pressed="' + !!(d && d.mus.includes(m)) + '">' + MUSCLES[m] + '</button>').join('') + '</div>';
+  const has = w => !!(c && c.days.some(x => x.wd === w));
+  let h = '<div class="wdpick" role="tablist" aria-label="Dzień tygodnia">' + WD_SHORT.map((l, w) => '<button role="tab" data-act="day-go" data-v="' + w + '" aria-selected="' + (w === wd) + '"' + (has(w) ? ' class="has"' : '') + '>' + l + '</button>').join('') + '</div>';
+  h += '<div class="eyebrow">Partie mięśni</div><div class="mgrid" role="group" aria-label="Partie mięśni">' + TRAINABLE.map(m => '<button class="mtog" data-act="pe-mus" data-wd="' + wd + '" data-m="' + m + '" aria-pressed="' + !!(d && d.mus.includes(m)) + '">' + MUSCLES[m] + '</button>').join('') + '</div>';
   if (d) {
     h += '<div class="eyebrow">Ćwiczenia · dotknij, żeby zmienić serie i powtórzenia</div>' + peExList(d, di) +
       '<div class="row"><button class="btn sm" data-act="pick-open" data-target="plan" data-d="' + di + '">+ Dodaj ćwiczenie</button><button class="btn sm ghost" data-act="pe-refill" data-d="' + di + '">↻ Dobierz inne</button></div>' +
