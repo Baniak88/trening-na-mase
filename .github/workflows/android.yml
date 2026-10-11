@@ -52,6 +52,20 @@ jobs:
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "APK z ${GITHUB_SHA}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" apk
 
+      - name: Plik do wydania
+        if: success()
+        run: cp android/app/build/outputs/apk/release/app-release.apk trening-na-mase.apk
+
+      - name: Wydanie na GitHubie (dla Obtainium)
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.1.${{ github.run_number }}
+          name: Trening na masę 1.1.${{ github.run_number }}
+          body: Automatyczna kompilacja z ${{ github.sha }}.
+          files: trening-na-mase.apk
+          make_latest: true
+
       - uses: actions/upload-artifact@v4
         if: success()
         with:
