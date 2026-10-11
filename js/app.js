@@ -418,6 +418,7 @@ function exRow(id, right, sub, act, extra) {
 }
 const chipRow = (act, opts, cur, label) => '<div class="chips" role="group" aria-label="' + label + '">' + opts.map(([k, l]) => '<button class="pill" data-act="' + act + '" data-v="' + k + '" aria-pressed="' + (String(cur) === String(k)) + '">' + l + '</button>').join('') + '</div>';
 
+const exWord = n => n + ' ' + (n === 1 ? 'ćwiczenie' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'ćwiczenia' : 'ćwiczeń');
 const setsWord = n => n + ' ' + (n === 1 ? 'seria' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'serie' : 'serii');
 const sameDay = (iso, d = new Date()) => dayStamp(new Date(iso)) === dayStamp(d);
 /** Mon–Sun strip: planned days, trained days and today. */
@@ -458,7 +459,7 @@ function daySheet() {
       '<button class="btn primary big" data-act="sheet-close">Gotowe</button>' +
       (wd !== weekdayOf() && d.ex.length ? '<button class="btn ghost wide" data-act="set-pick" data-v="' + di + '">Zrób ten trening dziś</button>' : '');
   } else h += '<p class="muted small">Zaznacz jedną lub kilka partii. Dobiorę ćwiczenia, przy których badania pokazały przyrost mięśni. Bez zaznaczenia to dzień wolny.</p>';
-  return sheetFrame(WEEKDAYS[wd], 'Plan tygodnia', d ? d.ex.length + ' ćwiczeń · ok. ' + estMin(d.ex, false) + ' min' : 'Odpoczynek', '', h);
+  return sheetFrame(WEEKDAYS[wd], 'Plan tygodnia', d ? exWord(d.ex.length) + ' · ok. ' + estMin(d.ex, false) + ' min' : 'Odpoczynek', '', h);
 }
 function viewHome() {
   const t = ensureToday(); const st = S.settings; const wk = cycleWeek(); const cy = CYCLE[wk]; const p = plan();
