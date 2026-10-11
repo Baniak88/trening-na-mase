@@ -10,7 +10,7 @@ a{color:var(--accent)}
   --bg:#F0F1EE; --surface:#FFFFFF; --sunk:#E6E8E3; --ink:#15171A; --muted:#5B6168; --line:#D5D8D2;
   --accent:#1C47C9; --accent-ink:#FFFFFF; --accent-soft:#DDE5FA;
   --ok:#17784D; --ok-soft:#DCF0E4; --warn:#9A5800; --warn-soft:#FBEBD3; --danger:#B3261E;
-  --body-base:#D9DCD5; --fig:#CDD3D9; --fig-line:#3D4550; --fig-far:#E3E6E9; --fig-far-line:#A2AAB3; --muscle:#E4472F; --pad:#3B424B; --eq:#6A717A; --eq2:#C9CDC6; --plate:#353B42; --shoe:#2A3038; --mark:#1C47C9; --danger-soft:#FBE3E1; --panel-a:#ECEEE9; --panel-b:#DFE2DC;
+  --body-base:#D9DCD5; --fig:#CDD3D9; --fig-line:#3D4550; --fig-far:#E3E6E9; --fig-far-line:#A2AAB3; --muscle:#E4472F; --muscle-edge:#A62E1C; --fig-hi:#FFFFFF; --pad:#3B424B; --eq:#6A717A; --eq2:#C9CDC6; --plate:#353B42; --shoe:#2A3038; --mark:#1C47C9; --danger-soft:#FBE3E1; --panel-a:#ECEEE9; --panel-b:#DFE2DC;
   --p25:#D21F3C; --p20:#1C47C9; --p15:#E3AC08; --p10:#1F8A4C; --p5:#F7F7F4; --p5e:#8E949B; --p2:#2A2D31; --p1:#B9BEC4; --sleeve:#9AA0A7;
   --display:"Barlow Condensed","Arial Narrow",sans-serif;
   --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
@@ -21,13 +21,13 @@ a{color:var(--accent)}
   --bg:#0E1012; --surface:#171A1E; --sunk:#21252A; --ink:#ECEDEA; --muted:#9CA2AA; --line:#2C3137;
   --accent:#7097FF; --accent-ink:#0A1230; --accent-soft:#1C2950;
   --ok:#4CC98A; --ok-soft:#14301F; --warn:#F0A646; --warn-soft:#3A2A12; --danger:#FF8A80;
-  --body-base:#2E333A; --fig:#A3ACB6; --fig-line:#0C0E11; --fig-far:#4E565F; --fig-far-line:#191C20; --muscle:#FF6247; --pad:#59616B; --eq:#8E959E; --eq2:#3A4048; --plate:#B8BFC8; --shoe:#2C3138; --mark:#8EA8FF; --danger-soft:#3A1716; --panel-a:#252A30; --panel-b:#1C2025;
+  --body-base:#2E333A; --fig:#A3ACB6; --fig-line:#0C0E11; --fig-far:#4E565F; --fig-far-line:#191C20; --muscle:#FF6247; --muscle-edge:#9E2F1F; --fig-hi:#E6EAEE; --pad:#59616B; --eq:#8E959E; --eq2:#3A4048; --plate:#B8BFC8; --shoe:#2C3138; --mark:#8EA8FF; --danger-soft:#3A1716; --panel-a:#252A30; --panel-b:#1C2025;
   --p20:#3D6BF0; --p2:#4B5057; --p5e:#5E646B; --sleeve:#6E747B; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0E1012; --surface:#171A1E; --sunk:#21252A; --ink:#ECEDEA; --muted:#9CA2AA; --line:#2C3137;
   --accent:#7097FF; --accent-ink:#0A1230; --accent-soft:#1C2950;
   --ok:#4CC98A; --ok-soft:#14301F; --warn:#F0A646; --warn-soft:#3A2A12; --danger:#FF8A80;
-  --body-base:#2E333A; --fig:#A3ACB6; --fig-line:#0C0E11; --fig-far:#4E565F; --fig-far-line:#191C20; --muscle:#FF6247; --pad:#59616B; --eq:#8E959E; --eq2:#3A4048; --plate:#B8BFC8; --shoe:#2C3138; --mark:#8EA8FF; --danger-soft:#3A1716; --panel-a:#252A30; --panel-b:#1C2025;
+  --body-base:#2E333A; --fig:#A3ACB6; --fig-line:#0C0E11; --fig-far:#4E565F; --fig-far-line:#191C20; --muscle:#FF6247; --muscle-edge:#9E2F1F; --fig-hi:#E6EAEE; --pad:#59616B; --eq:#8E959E; --eq2:#3A4048; --plate:#B8BFC8; --shoe:#2C3138; --mark:#8EA8FF; --danger-soft:#3A1716; --panel-a:#252A30; --panel-b:#1C2025;
   --p20:#3D6BF0; --p2:#4B5057; --p5e:#5E646B; --sleeve:#6E747B; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-inline:16px;padding-block:0 170px;-webkit-tap-highlight-color:transparent}
@@ -452,3 +452,17 @@ select,.field input{height:44px;border-radius:10px;border:1px solid var(--line);
 .wu b{font-size:14px}
 .sp span{font-size:13px}
 @media (max-width:370px){.excard{grid-template-columns:80px minmax(0,1fr)}.excard .thumb{width:80px}.today-top{grid-template-columns:minmax(0,1fr) 96px}.today h2{font-size:36px}}
+/* ---- v1.2: photo view ---- */
+.viewseg{grid-template-columns:1fr 1fr}
+.photos{position:relative;border-radius:12px;overflow:hidden;background:#111;aspect-ratio:4/3;max-width:100%}
+.photos img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transition:opacity .6s ease}
+.photos .ph1{animation:phx 4s ease-in-out infinite}
+.photos span.ph0{animation:phx0 4s ease-in-out infinite}
+.photos span.ph1{animation:phx 4s ease-in-out infinite}
+.photos.still .ph1,.photos.still span.ph0,.photos.still span.ph1{animation:none}
+.photos.still .ph1{opacity:0}.photos.still span.ph1{opacity:0}
+.photos.still.show1 .ph1,.photos.still.show1 span.ph1{opacity:1}
+.photos.still.show1 span.ph0{opacity:0}
+.phtag{position:absolute;left:10px;bottom:10px;padding:3px 10px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font:600 12px var(--body)}
+@keyframes phx{0%,38%{opacity:0}50%,88%{opacity:1}100%{opacity:0}}
+@keyframes phx0{0%,38%{opacity:1}50%,88%{opacity:0}100%{opacity:1}}

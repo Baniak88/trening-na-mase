@@ -1,7 +1,7 @@
 /* Service worker: the app works offline at the gym.
  * App files: cache first, refreshed on each new version (bump VERSION).
  * Google Fonts: served from cache, refreshed in the background. */
-const VERSION = 'v1.1.1';
+const VERSION = 'v1.2.0';
 const CACHE = 'tnm-' + VERSION;
 const APP = [
   './',
@@ -29,7 +29,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k.startsWith('tnm-') && k !== CACHE && k !== 'tnm-fonts').map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith('tnm-') && k !== CACHE && k !== 'tnm-fonts' && k !== 'tnm-img').map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -55,6 +55,11 @@ self.addEventListener('fetch', e => {
   if (url.origin !== location.origin) return;
   if (req.mode === 'navigate') {
     e.respondWith(caches.match('index.html').then(hit => hit || fetch(req)));
+    return;
+  }
+  if (url.pathname.includes('/img/')) {
+    // Exercise photos: cached the first time they are shown.
+    e.respondWith(caches.open('tnm-img').then(async c => (await c.match(req)) || fetch(req).then(r => { if (r.ok) c.put(req, r.clone()); return r; })));
     return;
   }
   e.respondWith(caches.match(req).then(hit => hit || fetch(req)));

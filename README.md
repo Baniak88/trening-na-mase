@@ -10,6 +10,7 @@ Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na ka�
 - **Mapa regeneracji.** Sylwetka z przodu i z tyłu pokazuje kolorami, które mięśnie są gotowe, a które jeszcze odpoczywają, i za ile godzin wrócą do formy.
 - **Siłownie ze sprzętem.** Np. „Siłownia” i „Dom”. Generator proponuje tylko ćwiczenia, które zrobisz w danym miejscu.
 - **50 ćwiczeń z animacją techniki:** linie kontrolne, fazy ruchu, typowe błędy pokazane na animacji, wskazówki i zamienniki.
+- **Zdjęcia ćwiczeń:** prawdziwe zdjęcia pozycji startowej i końcowej dla każdego ćwiczenia, z [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (domena publiczna).
 - **Trening krok po kroku:** jedno ćwiczenie na ekranie, duże przyciski do ciężaru i powtórzeń, timer przerwy z dźwiękiem, serie rozgrzewkowe, kalkulator talerzy.
 - **Progresja:** podwójna progresja (najpierw powtórzenia, potem ciężar), rekordy, szacowany 1RM, wykresy postępów.
 - **Cykl 6 tygodni:** wysiłek rośnie co tydzień, 6. tydzień jest lżejszy.

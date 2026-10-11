@@ -1,5 +1,5 @@
 /* Trening na masę: UI. Screens: Trening (today / session), Regeneracja, Ćwiczenia, Postępy, Ustawienia, Wiedza. */
-import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, PLANS, CYCLE, KINDS, KINDN, EQUIPMENT, canDo, primary} from './data/catalog.js';
+import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, PLANS, CYCLE, KINDS, KINDN, EQUIPMENT, PHOTO_CREDIT, canDo, primary} from './data/catalog.js';
 import {FC, figSVG, figBounds, visMark} from './figure.js';
 import {recovery, weeklySets, status} from './engine/recovery.js';
 import {generate, alternatives, prescribe, FOCUS, exSeconds} from './engine/generator.js';
@@ -196,7 +196,7 @@ function phaseAt(tl, t) { const total = tl.reduce((a, p) => a + p.d, 0); t = ((t
 function timeForK(tl, k) { if (!tl) return 0; let t = 0; for (const p of tl) { if (p.a !== p.b) { const lo = Math.min(p.a, p.b), hi = Math.max(p.a, p.b); if (k >= lo && k <= hi) { const x = (k - p.a) / (p.b - p.a); return t + Math.acos(1 - 2 * Math.max(0, Math.min(1, x))) / Math.PI * p.d; } } t += p.d; } return 0; }
 function drawFig(label) {
   const sh = UI.sheet; if (!sh || !sh.id) return; const f = EX[sh.id].fig; const box = $('#figAnim'); if (!box) return;
-  box.innerHTML = figSVG(sh.id, AN.k, FC, bigBox(sh.id), {mode: AN.mode, marks: AN.marks, ghost: AN.marks});
+  box.innerHTML = figSVG(sh.id, AN.k, FC, bigBox(sh.id), {mode: AN.mode, marks: AN.marks, ghost: AN.marks, detail: true});
   const sl = $('#figK'); if (sl && document.activeElement !== sl) sl.value = Math.round(AN.k * 1000);
   if (label != null) { const lb = $('#figPhase'); if (lb && lb.textContent !== label) lb.textContent = label; }
   const st = AN.k < 0.25 ? 0 : AN.k > 0.75 ? 2 : 1;
@@ -214,13 +214,13 @@ function loop(ts) {
   const dt = AN.last ? Math.min(100, ts - AN.last) : 16; AN.last = ts; let need = false; const sh = UI.sheet;
   if (sh && sh.id && $('#figAnim')) { const tl = timeline(EX[sh.id].fig); if (tl) { need = true; if (!AN.paused) { AN.t += dt * AN.speed; const r = phaseAt(tl, AN.t); AN.k = r.k; drawFig(r.p.l); } } }
   const il = !sh && !REDUCED ? $('#inlFig') : null;
-  if (il) { const id = il.dataset.id; const tl = timeline(EX[id].fig); if (tl) { need = true; INL.t += dt; const r = phaseAt(tl, INL.t); il.innerHTML = figSVG(id, r.k, FC, tightBox(id), {}); const lb = $('#inlPhase'); if (lb && lb.textContent !== r.p.l) lb.textContent = r.p.l; } }
+  if (il) { const id = il.dataset.id; const tl = timeline(EX[id].fig); if (tl) { need = true; INL.t += dt; const r = phaseAt(tl, INL.t); il.innerHTML = figSVG(id, r.k, FC, tightBox(id), {detail: true}); const lb = $('#inlPhase'); if (lb && lb.textContent !== r.p.l) lb.textContent = r.p.l; } }
   if (need) AN.raf = requestAnimationFrame(loop); else { AN.raf = 0; AN.last = 0; }
 }
 function kick() { if (!AN.raf) AN.raf = requestAnimationFrame(loop); }
 
 /* ---------- Sheets ---------- */
-function openSheet(id, ctx) { UI.sheet = {id, ctx: ctx || null, tab: 'ruch'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
+function openSheet(id, ctx) { UI.sheet = {id, ctx: ctx || null, tab: 'ruch', view: UI.lastView || 'fig'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
 function openPanel(type, extra) { UI.sheet = {type, ...(extra || {})}; renderSheet(true); }
 function closeSheet() { UI.sheet = null; $('#sheetRoot').innerHTML = ''; document.body.classList.remove('lock'); kick(); }
 function sheetFrame(title, eyebrow, sub, tabs, body) {
@@ -249,7 +249,14 @@ function exSheet() {
   const pat = (PATTERNS.find(p => p[0] === ex.p) || ['', ''])[1];
   const tabs = '<div class="stabs" role="tablist">' + [['ruch', 'Ruch'], ['info', 'Wskazówki']].concat(alts.length ? [['alt', ctx ? 'Zamień' : 'Zamienniki']] : []).map(([k, l]) => '<button role="tab" data-act="stab" data-t="' + k + '" aria-selected="' + (sh.tab === k) + '">' + l + '</button>').join('') + '</div>';
   let h = '';
-  if (sh.tab === 'ruch') {
+  if (sh.tab === 'ruch' && ex.photo) h += '<div class="seg viewseg" role="group" aria-label="Widok"><button data-act="view" data-v="fig" aria-pressed="' + (sh.view !== 'photo') + '">Rysunek z liniami</button><button data-act="view" data-v="photo" aria-pressed="' + (sh.view === 'photo') + '">Zdjęcia</button></div>';
+  if (sh.tab === 'ruch' && sh.view === 'photo' && ex.photo) {
+    h += '<div class="photos' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + ex.photo + '-0.jpg" alt="' + esc(ex.n) + ': pozycja startowa" class="ph0"><img src="' + ex.photo + '-1.jpg" alt="' + esc(ex.n) + ': pozycja końcowa" class="ph1"><span class="phtag ph0">' + (f.sA || ['Start'])[0] + '</span><span class="phtag ph1">' + (f.sB || ['Koniec'])[0] + '</span></div>';
+    h += '<div class="steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><span>1</span>' + (f.sA || ['Start'])[0] + '</button><button data-act="photo-k" data-k="2"><span>↻</span>Na zmianę</button><button data-act="photo-k" data-k="1"><span>2</span>' + (f.sB || ['Koniec'])[0] + '</button></div>';
+    if (f.sA) h += '<p class="steptxt"><b>' + f.sA[0] + ':</b> ' + f.sA[1] + '</p>';
+    if (f.sB) h += '<p class="steptxt"><b>' + f.sB[0] + ':</b> ' + f.sB[1] + '</p>';
+    h += '<p class="muted small">Zdjęcia: <a href="' + PHOTO_CREDIT[1] + '" target="_blank" rel="noopener">' + PHOTO_CREDIT[0] + '</a> (domena publiczna). Sprzęt na zdjęciu może się trochę różnić od opisu.</p>';
+  } else if (sh.tab === 'ruch') {
     const marks = (f.marks || []).filter(m => m.n).sort((a, b) => a.n - b.n);
     h += '<div class="modes" role="group" aria-label="Wariant"><button class="mode ok" data-act="mode" data-m="-1" aria-pressed="' + (AN.mode < 0) + '">✓ Poprawnie</button>' + bad.map((b, i) => '<button class="mode bad" data-act="mode" data-m="' + i + '" aria-pressed="' + (AN.mode === i) + '">✕ ' + b.l + '</button>').join('') + '</div>';
     h += '<div class="figwrap' + (bd ? ' isbad' : '') + '"><div class="figbox big" id="figAnim" style="aspect-ratio:' + (bigBox(sh.id).w / bigBox(sh.id).h).toFixed(3) + '"></div>' + (bd ? '<span class="figtag">Błąd</span>' : '') + '</div>';
@@ -321,6 +328,8 @@ $('#sheetRoot').addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]'); if (!b) return; const a = b.dataset.act;
   if (a === 'sheet-close') { if (b.classList.contains('sheet-bg') && ev.target.closest('[data-stop]')) return; closeSheet(); return; }
   if (a === 'stab') { UI.sheet.tab = b.dataset.t; renderSheet(true); return; }
+  if (a === 'view') { UI.sheet.view = UI.lastView = b.dataset.v; renderSheet(false); return; }
+  if (a === 'photo-k') { const p = $('#photos'); if (!p) return; p.classList.remove('show0', 'show1', 'still'); if (b.dataset.k !== '2') p.classList.add('still', 'show' + b.dataset.k); document.querySelectorAll('.steps button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); return; }
   if (a === 'anim-toggle') { AN.paused = !AN.paused; AN.last = 0; b.textContent = AN.paused ? '▶ Odtwórz' : '❚❚ Pauza'; if (!AN.paused) { AN.t = timeForK(timeline(EX[UI.sheet.id].fig), AN.k); kick(); } return; }
   if (a === 'speed') { AN.speed = AN.speed === 1 ? 0.5 : 1; b.textContent = AN.speed === 1 ? '1×' : '0,5×'; return; }
   if (a === 'mode') { AN.mode = +b.dataset.m; renderSheet(false); return; }
@@ -429,7 +438,7 @@ function viewSession() {
     (UI.wuOpen ? '<ul><li>3–5 min lekkiego cardio: rower, orbitrek, szybki marsz</li><li>Krążenia ramion i bioder, wymachy nóg po 10</li><li>10 przysiadów i 10 pompek bez obciążenia</li><li>Przed ciężkim ćwiczeniem zrób serie rozgrzewkowe pokazane przy nim</li></ul>' : '') + '</section>';
   h += '<section class="player" id="player"><div class="pl-head"><button class="pl-count" data-act="list" aria-haspopup="dialog">Ćwiczenie ' + (i + 1) + ' z ' + n + ' ▾</button><button class="btn sm ghost" data-act="tech" data-i="' + i + '">Zamień</button></div>' +
     '<h2 class="pl-name">' + ex.n + '</h2><div class="row"><span class="chip">' + q.sets.length + ' × ' + range(ex, q) + '</span><span class="chip">przerwa ' + mmss(q.rest) + '</span><span class="chip m">' + KINDN[ex.kind] + '</span>' + (ex.uni ? '<span class="chip m">na stronę</span>' : '') + '</div>' +
-    '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '"><span class="inl" id="inlFig" data-id="' + q.id + '">' + figSVG(q.id, thumbK(ex), FC, tightBox(q.id), {}) + '</span><span class="inl-cap"><span id="inlPhase">Technika</span><b>Technika i błędy ›</b></span></button>' +
+    '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '"><span class="inl" id="inlFig" data-id="' + q.id + '">' + figSVG(q.id, thumbK(ex), FC, tightBox(q.id), {detail: true}) + '</span><span class="inl-cap"><span id="inlPhase">Technika</span><b>Technika i błędy ›</b></span></button>' +
     '<p class="hint' + (q.up ? ' up' : q.dl ? ' dl' : '') + '">' + (q.up ? '<span class="mono">↑</span>' : '') + '<span>' + q.hint + '</span></p>';
   if (ex.kind === 'bar' && !q.dl) { const rp = ramp(q.sets[0].kg); if (rp.length) h += '<div class="ramp"><span class="eyebrow">Rozgrzewka:</span>' + rp.map((r, j) => '<button data-act="wu" data-i="' + i + '" data-j="' + j + '" aria-pressed="' + !!(q.wu || [])[j] + '">' + fmt(r[0]) + '×' + r[1] + '</button>').join('') + '</div>'; }
   h += '<div class="setpills" role="group" aria-label="Serie">' + q.sets.map((x, j) => '<button class="sp' + (x.done ? ' done' : '') + (j === k ? ' sel' : '') + '" data-act="sel" data-i="' + i + '" data-k="' + j + '" aria-label="Seria ' + (j + 1) + (x.done ? ', zrobiona' : '') + '"><small>Seria ' + (j + 1) + '</small><span>' + (x.kg == null ? (x.reps ?? q.lo) + ' powt.' : fmt(x.kg) + '×' + (x.reps ?? '–')) + '</span></button>').join('') +
@@ -534,7 +543,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Trening na masę · wersja 1.1 · <a href="https://github.com/Baniak88/trening-na-mase" target="_blank" rel="noopener">kod na GitHubie</a></p>';
+  h += '<p class="muted small center">Trening na masę · wersja 1.2 · <a href="https://github.com/Baniak88/trening-na-mase" target="_blank" rel="noopener">kod na GitHubie</a></p>';
   return h + '</div>';
 }
 const SRC = [
@@ -549,6 +558,7 @@ const SRC = [
   ['Bell i in. 2024: praktyki deloadu', 'https://doaj.org/article/7d15e260e0ac4cff9e8c685dd7335389'],
   ['fabrykasily.pl: budowanie masy, podejście oparte na badaniach', 'https://www.fabrykasily.pl/treningi/budowanie-masy-miesniowej-aktualne-podejscie-oparte-na-badaniach'],
   ['budujmase.pl: 10 najlepszych ćwiczeń na masę', 'https://www.budujmase.pl/trening/10-najlepszych-cwiczen-na-mase-miesniowa.html'],
+  ['Zdjęcia ćwiczeń: free-exercise-db (domena publiczna)', 'https://github.com/yuhonas/free-exercise-db'],
 ];
 const protein = bw => (bw ? Math.round(bw * 1.6) + '–' + Math.round(bw * 2) + ' g' : '–');
 function viewKnow() {

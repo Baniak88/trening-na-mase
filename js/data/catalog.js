@@ -544,4 +544,7 @@ export const KINDN={bar:'Sztanga',db:'Hantle',machine:'Maszyna',cable:'Wyciąg',
 /** Muscle size class drives recovery time and weekly set targets. */
 export const MUSCLE_INFO={chest:{h:72,target:[10,20]},back:{h:72,target:[10,20]},quads:{h:72,target:[10,20]},hams:{h:72,target:[10,20]},glutes:{h:72,target:[10,20]},
  delts:{h:48,target:[10,20]},biceps:{h:48,target:[8,16]},triceps:{h:48,target:[8,16]},calves:{h:36,target:[6,16]},abs:{h:36,target:[6,16]}};
+/* Start/end photos from free-exercise-db (public domain), stored as img/ex/<id>-0.jpg and -1.jpg. */
+export const PHOTO_CREDIT=['free-exercise-db','https://github.com/yuhonas/free-exercise-db'];
+for(const id in EX)EX[id].photo='img/ex/'+id;
 export {MUSCLES,PATTERNS,EX,PLANS,CYCLE,KINDS};
