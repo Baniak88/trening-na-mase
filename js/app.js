@@ -5,7 +5,7 @@ import {recovery, weeklySets, status} from './engine/recovery.js';
 import {generate, alternatives, prescribe, FOCUS, exSeconds} from './engine/generator.js';
 import {suggestLoad, sessionsOf, e1rm, fmt} from './engine/progression.js';
 import {load, save, persist, exportJSON, importData, defaultState} from './store.js';
-import {bodyMap} from './bodymap.js';
+import {bodyMap, targetMap} from './bodymap.js';
 
 /* ---------- Helpers ---------- */
 const PLATES = [[25, '--p25', 44, 9], [20, '--p20', 44, 8], [15, '--p15', 40, 7], [10, '--p10', 34, 6], [5, '--p5', 26, 5], [2.5, '--p2', 22, 4], [1.25, '--p1', 18, 3]];
@@ -260,6 +260,8 @@ function exSheet() {
   } else if (sh.tab === 'info') {
     const prim = primary(ex), sec = Object.keys(ex.m).filter(k => ex.m[k] < 1);
     const best = Math.max(0, ...sessionsOf(S.workouts, sh.id, true).flatMap(s => s.sets.map(x => x.kg || 0)));
+    const why = ctx && ctx.from === 'today' && S.today && S.today.items[ctx.idx] ? S.today.items[ctx.idx].why : '';
+    if (why) h += '<p class="whytoday"><b>Dlaczego dziś:</b> ' + esc(why) + '</p>';
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Mięśnie</div><div class="row">' + prim.map(k => '<span class="chip m prim">' + MUSCLES[k] + '</span>').join('') + sec.map(k => '<span class="chip m">' + MUSCLES[k] + ' · pomocniczo</span>').join('') + '</div></div>';
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Sprzęt</div><p class="small">' + (ex.needs.length ? ex.needs.map(n => EQUIPMENT.find(e => e[0] === n)[1]).join(', ') : 'Bez sprzętu') + '</p></div>';
     if (best) h += '<p class="small">Twój rekord: <b class="mono">' + kgTxt(ex, best) + '</b></p>';
@@ -380,9 +382,11 @@ function viewHome() {
   let h = '<div class="stack">';
   if (!st.welcomed) h += '<section class="card welcome"><b>Trening układa się sam.</b><p class="small">Aplikacja patrzy, które mięśnie są wypoczęte, jaki masz sprzęt i ile masz czasu. Po każdym treningu kolejny dopasowuje się do tego, co zrobiłeś. Ciężary podpowiada z Twojej historii.</p><button class="btn sm" data-act="welcomed">Rozumiem</button></section>';
   if (UI.summary) { const w = UI.summary; h += '<section class="card summary"><h3>Trening zapisany</h3><p style="margin-top:6px">' + esc(w.dayName) + ' · ' + w.ex.reduce((a, q) => a + q.sets.length, 0) + ' serii · objętość <b class="mono">' + fmt(Math.round(volume(w))) + ' kg</b></p>' + (w.prs.length ? '<div class="row" style="margin-top:10px">' + w.prs.map(q => '<span class="chip pr">Rekord: ' + EX[q].n + '</span>').join('') + '</div>' : '') + '<div class="row" style="margin-top:12px"><button class="btn sm" data-act="go" data-tab="recovery">Zobacz regenerację</button><button class="btn sm ghost" data-act="go" data-tab="progress">Postępy</button></div></section>'; }
-  const focusM = [...new Set(t.items.flatMap(it => primary(EX[it.id])))].filter(m => m !== 'abs').slice(0, 5);
-  h += '<section class="card today"><div class="row" style="justify-content:space-between"><div class="eyebrow">' + (t.mode === 'plan' ? 'Plan · ' + plan().name : 'Dziś · ' + (st.focus === 'auto' ? 'dobrane automatycznie' : 'wybrany zakres')) + '</div><span class="chip' + (cy.deload ? ' dl' : '') + '">T' + (wk + 1) + ' · ' + (cy.deload ? 'lżej' : 'RIR ' + cy.rir) + '</span></div>' +
-    '<h2>' + esc(t.title) + '</h2><div class="muted small">' + t.items.length + ' ćwiczeń · ok. ' + t.estMin + ' min · ' + esc(profile().name) + '</div>' +
+  const focusM = [...new Set(t.items.flatMap(it => primary(EX[it.id])))].filter(m => m !== 'abs').slice(0, 4);
+  const load = {}; t.items.forEach(it => { const m = EX[it.id].m; for (const k in m) load[k] = (load[k] || 0) + m[k] * it.sets; });
+  h += '<section class="card today"><div class="today-top"><div class="today-txt"><div class="eyebrow">' + (t.mode === 'plan' ? 'Plan · ' + plan().name : 'Dziś · ' + (st.focus === 'auto' ? 'dobrane dla Ciebie' : 'wybrany zakres')) + '</div>' +
+    '<h2>' + esc(t.title) + '</h2><div class="today-meta"><span><b class="mono">' + t.items.length + '</b> ćwiczeń</span><span><b class="mono">' + t.estMin + '</b> min</span></div><span class="chip' + (cy.deload ? ' dl' : '') + '">Tydz. ' + (wk + 1) + ' · ' + (cy.deload ? 'lżej' : 'RIR ' + cy.rir) + '</span></div>' +
+    '<div class="today-map">' + targetMap(load) + '</div></div>' +
     (focusM.length ? '<div class="recchips">' + focusM.map(m => '<span class="recchip ' + status(rec[m].pct) + '"><i></i>' + MUSCLES[m] + ' ' + rec[m].pct + '%</span>').join('') + '</div>' : '') +
     (t.light ? '<p class="notice small"><b>Mięśnie jeszcze się regenerują.</b> Proponuję lżejszy trening albo dzień wolny.</p>' : '') +
     (t.mode === 'auto' && !t.auto && t.items.length < 3 ? '<p class="notice small"><b>Wybrane mięśnie jeszcze się regenerują.</b> Ustaw zakres „Auto”, a dobiorę wypoczęte partie.</p>' : '') +
@@ -401,12 +405,15 @@ function viewHome() {
     h += '<button class="linkbtn" data-act="go-settings">Więcej ustawień: tryb, plan, sprzęt ›</button></div>';
   }
   h += '</section>';
-  h += '<section class="card" style="padding-block:6px"><ul class="exlist">' + t.items.map((it, i) => {
+  h += '<section class="stack" style="gap:8px"><div class="row" style="justify-content:space-between"><div class="sec-t">Ćwiczenia</div><span class="muted small">dotknij, żeby zobaczyć technikę</span></div><ol class="excards">' + t.items.map((it, i) => {
     const ex = EX[it.id]; const sg = suggestLoad(S.workouts, it, {deload: t.deload}); const n = t.deload ? Math.ceil(it.sets / 2) : it.sets;
     const tgt = sg.kg != null && !sg.first ? kgTxt(ex, sg.kg) : 'dobierz ciężar';
-    const sub = '<span class="hn' + (sg.up ? ' up' : '') + '" style="display:block">' + (sg.up ? '↑ ' : '') + tgt + '</span>' + (it.why ? '<span class="why" style="display:block">' + esc(it.why) + '</span>' : '') + (it.via === 'equip' ? '<span class="sub-note" style="display:block">zamiast: ' + EX[it.orig].n + ' (sprzęt)</span>' : it.via === 'sub' ? '<span class="sub-note" style="display:block">zamiast: ' + EX[it.orig].n + '</span>' : '');
-    return exRow(it.id, n + ' × ' + range(ex, it), sub, 'today-ex', ' data-idx="' + i + '"');
-  }).join('') + '</ul>' + (t.items.length ? '' : '<p class="muted" style="padding:12px 0">Brak ćwiczeń dla tego sprzętu i zakresu. Zmień siłownię albo zakres.</p>') +
+    const pm = primary(ex)[0]; const pr = rec[pm];
+    const note = it.via === 'equip' ? 'zamiast: ' + EX[it.orig].n + ' (sprzęt)' : it.via === 'sub' ? 'zamiast: ' + EX[it.orig].n : '';
+    return '<li><button class="excard" data-act="today-ex" data-id="' + it.id + '" data-idx="' + i + '"><span class="exnum mono">' + (i + 1) + '</span><span class="thumb">' + thumb(it.id) + '</span><span class="exbody"><b class="nm">' + ex.n + '</b>' +
+      '<span class="exline"><span class="chip mono">' + n + ' × ' + range(ex, it) + '</span><span class="chip mono' + (sg.up ? ' up' : '') + '">' + (sg.up ? '↑ ' : '') + tgt + '</span></span>' +
+      (pm && pr ? '<span class="extag"><span class="recchip ' + status(pr.pct) + '"><i></i>' + MUSCLES[pm] + ' ' + pr.pct + '%</span>' + (note ? '<span class="sub-note">' + esc(note) + '</span>' : '') + '</span>' : '') + '</span></button></li>';
+  }).join('') + '</ol>' + (t.items.length ? '' : '<p class="muted card">Brak ćwiczeń dla tego sprzętu i zakresu. Zmień siłownię albo zakres.</p>') +
     '<div class="row today-actions">' + (t.mode === 'auto' ? '<button class="btn sm" data-act="shuffle">↻ Inne ćwiczenia</button>' : '') + '<button class="btn sm ghost" data-act="pick-open" data-target="today">+ Dodaj ćwiczenie</button></div></section>';
   h += '<section class="card row" style="justify-content:space-between"><div><div class="eyebrow">Ten tydzień</div><b>' + thisWeek + (st.mode === 'plan' ? ' z ' + plan().perWeek : '') + ' treningów</b></div><div class="week">' + Array.from({length: st.mode === 'plan' ? plan().perWeek : Math.max(3, thisWeek)}, (_, i) => '<span class="' + (i < thisWeek ? 'on' : '') + '"></span>').join('') + '</div></section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Jak to działa?</b><span class="muted small" style="display:block">Regeneracja, objętość i progresja z kursów trenerskich i badań</span></span><span aria-hidden="true">›</span></button>';
@@ -423,10 +430,10 @@ function viewSession() {
     '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '"><span class="inl" id="inlFig" data-id="' + q.id + '">' + figSVG(q.id, thumbK(ex), FC, tightBox(q.id), {}) + '</span><span class="inl-cap"><span id="inlPhase">Technika</span><b>Technika i błędy ›</b></span></button>' +
     '<p class="hint' + (q.up ? ' up' : q.dl ? ' dl' : '') + '">' + (q.up ? '<span class="mono">↑</span>' : '') + '<span>' + q.hint + '</span></p>';
   if (ex.kind === 'bar' && !q.dl) { const rp = ramp(q.sets[0].kg); if (rp.length) h += '<div class="ramp"><span class="eyebrow">Rozgrzewka:</span>' + rp.map((r, j) => '<button data-act="wu" data-i="' + i + '" data-j="' + j + '" aria-pressed="' + !!(q.wu || [])[j] + '">' + fmt(r[0]) + '×' + r[1] + '</button>').join('') + '</div>'; }
-  h += '<div class="setpills" role="group" aria-label="Serie">' + q.sets.map((x, j) => '<button class="sp' + (x.done ? ' done' : '') + (j === k ? ' sel' : '') + '" data-act="sel" data-i="' + i + '" data-k="' + j + '" aria-label="Seria ' + (j + 1) + (x.done ? ', zrobiona' : '') + '"><small>Seria ' + (j + 1) + '</small><span>' + (x.kg == null ? '–' : fmt(x.kg)) + '×' + (x.reps ?? '–') + '</span></button>').join('') +
+  h += '<div class="setpills" role="group" aria-label="Serie">' + q.sets.map((x, j) => '<button class="sp' + (x.done ? ' done' : '') + (j === k ? ' sel' : '') + '" data-act="sel" data-i="' + i + '" data-k="' + j + '" aria-label="Seria ' + (j + 1) + (x.done ? ', zrobiona' : '') + '"><small>Seria ' + (j + 1) + '</small><span>' + (x.kg == null ? (x.reps ?? q.lo) + ' powt.' : fmt(x.kg) + '×' + (x.reps ?? '–')) + '</span></button>').join('') +
     '<button class="sp add" data-act="addset" data-i="' + i + '" aria-label="Dodaj serię">+</button></div>';
   h += '<div class="panel"><div class="row" style="justify-content:space-between"><b>Seria ' + (k + 1) + ' z ' + q.sets.length + '</b><span class="muted small">' + (s.done ? 'zrobiona' : 'cel: ' + range(ex, q) + (q.dl ? '' : ' · RIR ' + CYCLE[d.week ?? 0].rir)) + '</span></div>' +
-    '<div class="steppers"><div class="stp"><label for="kg-' + i + '">' + unitHead(ex) + '</label><div class="ctl"><button data-act="step" data-f="kg" data-d="-1" data-i="' + i + '" aria-label="Mniej kg">−</button><input id="kg-' + i + '" inputmode="decimal" autocomplete="off" data-f="kg" data-i="' + i + '" data-k="' + k + '" value="' + fmt(s.kg) + '" placeholder="–"><button data-act="step" data-f="kg" data-d="1" data-i="' + i + '" aria-label="Więcej kg">+</button></div></div>' +
+    '<div class="steppers"><div class="stp"><label for="kg-' + i + '">' + unitHead(ex) + '</label><div class="ctl"><button data-act="step" data-f="kg" data-d="-1" data-i="' + i + '" aria-label="Mniej kg">−</button><input id="kg-' + i + '" inputmode="decimal" autocomplete="off" data-f="kg" data-i="' + i + '" data-k="' + k + '" value="' + fmt(s.kg) + '" placeholder="kg"><button data-act="step" data-f="kg" data-d="1" data-i="' + i + '" aria-label="Więcej kg">+</button></div></div>' +
     '<div class="stp"><label for="rp-' + i + '">' + (isS(ex) ? 'Sekundy' : 'Powtórzenia') + '</label><div class="ctl"><button data-act="step" data-f="reps" data-d="-1" data-i="' + i + '" aria-label="Mniej">−</button><input id="rp-' + i + '" inputmode="numeric" autocomplete="off" data-f="reps" data-i="' + i + '" data-k="' + k + '" value="' + (s.reps ?? '') + '" placeholder="' + q.lo + '"><button data-act="step" data-f="reps" data-d="1" data-i="' + i + '" aria-label="Więcej">+</button></div></div></div>' +
     (s.done ? '<button class="btn wide" data-act="undo" data-i="' + i + '">Cofnij odhaczenie</button>' : '<button class="btn ok big" data-act="save" data-i="' + i + '">Seria zrobiona ✓</button>') + '</div>';
   if (ex.kind === 'bar') h += '<div class="plates" id="pl' + i + '">' + platesHTML(s.kg) + '</div>';
@@ -525,7 +532,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Trening na masę · wersja 1.0 · <a href="https://github.com/Baniak88/trening-na-mase" target="_blank" rel="noopener">kod na GitHubie</a></p>';
+  h += '<p class="muted small center">Trening na masę · wersja 1.1 · <a href="https://github.com/Baniak88/trening-na-mase" target="_blank" rel="noopener">kod na GitHubie</a></p>';
   return h + '</div>';
 }
 const SRC = [

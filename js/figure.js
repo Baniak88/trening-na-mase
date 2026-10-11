@@ -2,7 +2,7 @@
 import {EX} from './data/catalog.js';
 /* ---------- Figure engine: side-view body solved from joint targets, with muscles and coaching marks ---------- */
 const FL={th:44,sh:42,ua:30,fa:28,to:50,ft:14,heel:4,neck:8,head:10};
-const FC={fig:'var(--fig)',far:'var(--fig-far)',hl:'var(--accent)',eq:'var(--eq)',eq2:'var(--eq2)',plate:'var(--plate)',ground:'var(--line)',bg:'var(--sunk)',mark:'var(--mark)',bad:'var(--danger)',shoe:'var(--shoe)'};
+const FC={fig:'var(--fig)',far:'var(--fig-far)',line:'var(--fig-line)',farLine:'var(--fig-far-line)',hl:'var(--muscle)',eq:'var(--eq)',eq2:'var(--eq2)',pad:'var(--pad)',plate:'var(--plate)',ground:'var(--line)',bg:'var(--sunk)',mark:'var(--mark)',bad:'var(--danger)',shoe:'var(--shoe)'};
 const rad=d=>d*Math.PI/180, dir=(d,l)=>[l*Math.cos(rad(d)),l*Math.sin(rad(d))];
 const add=(a,b)=>[a[0]+b[0],a[1]+b[1]], sub=(a,b)=>[a[0]-b[0],a[1]-b[1]], mul=(a,s)=>[a[0]*s,a[1]*s];
 const len=v=>Math.hypot(v[0],v[1])||0.0001, unit=v=>mul(v,1/len(v)), lerp2=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
@@ -100,7 +100,7 @@ function torsoPath(J){
   return smooth(fr.concat(bk.reverse()));
 }
 function muscleShapes(J,ex,C){
-  const out=[],arm=[];const op=w=>w>=1?0.95:0.5;const m=ex.m||{};
+  const out=[],arm=[];const op=w=>w>=1?0.92:0.45;const m=ex.m||{};
   const seg=(a,b,side,f0,f1,wid,w,cw)=>{const v=sub(b,a);const n=unit([-v[1],v[0]]);const off=mul(n,side*wid*0.22);
     out.push(cap(add(lerp2(a,b,f0),off),add(lerp2(a,b,f1),off),wid*0.55,(cw||wid)*0.5,C.hl,' opacity="'+op(w)+'"'));};
   const tor=(side,f0,f1,wid,w)=>{const pts=[];for(let i=0;i<=6;i++){const f=f0+(f1-f0)*i/6;const t=torsoFrame(J,f);pts.push(J.front?t.p:add(t.p,mul(side>0?t.front:t.back,wid*0.42)));}
@@ -120,10 +120,15 @@ function muscleShapes(J,ex,C){
   }
   return[out.join(''),arm.join('')];
 }
+const OW=1.4;
 function headSVG(J,C){
-  let s=cir(J.head,FL.head,C.fig,' stroke="'+C.bg+'" stroke-width="1.5"');
-  if(J.front){s+=cir(add(J.head,[-3.5,1]),1.4,C.bg)+cir(add(J.head,[3.5,1]),1.4,C.bg);}
-  else{const face=J.hd-90;s+=cir(add(add(J.head,dir(face,5)),dir(J.hd,2)),1.5,C.bg)+cap(add(J.head,dir(face,8.5)),add(add(J.head,dir(face,10.5)),dir(J.hd,-1.5)),3,2.4,C.fig);}
+  const r=FL.head;let s=cir(J.head,r+OW,C.line);
+  if(!J.front){const face=J.hd-90;const nose=add(add(J.head,dir(face,r-0.5)),dir(J.hd,-1));s+=cir(nose,2.6+OW,C.line)+cir(nose,2.6,C.fig);}
+  s+=cir(J.head,r,C.fig);
+  const a0=J.front?J.hd-75:J.hd-25,a1=J.front?J.hd+75:J.hd+125;const o=[],n=[];
+  for(let i=0;i<=12;i++){const a=a0+(a1-a0)*i/12;o.push(add(J.head,dir(a,r+0.6)));}
+  for(let i=12;i>=0;i--){const a=a0+(a1-a0)*i/12;const t=Math.sin(Math.PI*i/12);n.push(add(J.head,dir(a,r-1.2-3.8*t)));}
+  s+='<path d="M'+o.concat(n).map(P).join(' L')+'Z" fill="'+C.shoe+'"/>';
   return s;
 }
 function badge(c,n,col,C){return cir(c,6.5,col,' stroke="'+C.bg+'" stroke-width="1.5"')+'<text x="'+c[0].toFixed(1)+'" y="'+(-c[1]+3).toFixed(1)+'" text-anchor="middle" font-size="8.5" font-weight="700" font-family="IBM Plex Sans,system-ui,sans-serif" fill="'+C.bg+'">'+n+'</text>';}
@@ -156,36 +161,38 @@ function figSVG(exId,k,C,box,o){
   const [A,B,bd]=poses(ex,o.mode);const J=solve(lerpPose(A,B,k),f.front);
   let back='',mid='',front='';
   if(b.ground){back+=lnS([b.x0,-1.5],[b.x0+b.w,-1.5],2,C.ground);if(!f.front){const fx=[J.toe[0],J.heel[0],J.f2[0][0],J.f2[1][0]];const cx=(Math.min(...fx)+Math.max(...fx))/2;back+='<ellipse cx="'+cx.toFixed(1)+'" cy="0.5" rx="'+Math.max(18,(Math.max(...fx)-Math.min(...fx))/2+10).toFixed(1)+'" ry="3" fill="'+C.ground+'" opacity=".7"/>';}}
-  if(o.ghost&&!f.static){const Jg=solve(lerpPose(A,B,k<0.5?1:0),f.front);back+='<g opacity=".16">'+'<path d="'+torsoPath(Jg)+'" fill="'+C.fig+'"/>'+cap(Jg.hipN,Jg.k1,15,10.5,C.fig)+cap(Jg.k1,Jg.an1,10.5,7,C.fig)+cap(Jg.shN,Jg.e1,10,8,C.fig)+cap(Jg.e1,Jg.w1,8,6.5,C.fig)+cir(Jg.head,FL.head,C.fig)+'</g>';}
+  if(o.ghost&&!f.static){const Jg=solve(lerpPose(A,B,k<0.5?1:0),f.front);back+='<g opacity=".13">'+'<path d="'+torsoPath(Jg)+'" fill="'+C.fig+'"/>'+cap(Jg.hipN,Jg.k1,15,10.5,C.fig)+cap(Jg.k1,Jg.an1,10.5,7,C.fig)+cap(Jg.shN,Jg.e1,10,8,C.fig)+cap(Jg.e1,Jg.w1,8,6.5,C.fig)+cir(Jg.head,FL.head,C.fig)+'</g>';}
   f.eq.forEach(q=>{
-    if(q.t==='bench'){if(!q.noLegs){const a=q.pts[0],z=q.pts[q.pts.length-1];back+=lnS([a[0]+5,a[1]-3],[a[0]+5,0],4,C.eq)+lnS([z[0]-5,z[1]-3],[z[0]-5,0],4,C.eq)+lnS([a[0]+1,0],[a[0]+9,0],3,C.eq)+lnS([z[0]-9,0],[z[0]-1,0],3,C.eq);}back+=plS(q.pts,9,C.eq2)+plS(q.pts,3,C.bg,' opacity=".35"');}
+    if(q.t==='bench'){if(!q.noLegs){const a=q.pts[0],z=q.pts[q.pts.length-1];back+=lnS([a[0]+5,a[1]-3],[a[0]+5,0],4,C.eq)+lnS([z[0]-5,z[1]-3],[z[0]-5,0],4,C.eq)+lnS([a[0]+1,0],[a[0]+9,0],3,C.eq)+lnS([z[0]-9,0],[z[0]-1,0],3,C.eq);}back+=plS(q.pts,10,C.pad)+plS(q.pts,2.2,C.bg,' opacity=".22"');}
     if(q.t==='dip')back+=lnS([q.x1,q.y],[q.x2,q.y],5,C.eq)+lnS([q.x1+3,q.y],[q.x1+3,0],4,C.eq2)+lnS([q.x2-3,q.y],[q.x2-3,0],4,C.eq2);
     if(q.t==='pullbar')back+=lnS(q.at,add(q.at,[0,14]),3,C.eq2)+cir(q.at,4,C.eq);
-    if(q.t==='box')back+='<rect x="'+q.x+'" y="'+(-q.h)+'" width="'+q.w+'" height="'+q.h+'" rx="2" fill="'+C.eq2+'"/>';
+    if(q.t==='box')back+='<rect x="'+q.x+'" y="'+(-q.h)+'" width="'+q.w+'" height="'+q.h+'" rx="2.5" fill="'+C.eq2+'" stroke="'+C.eq+'" stroke-width="1.2"/>';
     if(q.t==='plate')back+=lnS([q.x,q.y1],[q.x,q.y2],6,C.eq2);
     if(q.t==='cable'){const h=eqPoint(J,q);if(q.from[1]>24&&!f.front){const px=q.from[0]+(q.from[0]>=J.hip[0]?7:-7);back+=lnS([px,q.from[1]+6],[px,0],7,C.eq2)+lnS([px-6,0],[px+6,0],4,C.eq2);}else if(!f.front&&q.from[1]<=24){back+=lnS([q.from[0]+(q.from[0]>=J.hip[0]?7:-7),q.from[1]+8],[q.from[0]+(q.from[0]>=J.hip[0]?7:-7),0],7,C.eq2);}back+=lnS(q.from,h,1.4,C.eq)+cir(q.from,5,'none',' stroke="'+C.eq+'" stroke-width="2"');front+=cir(h,3.5,C.eq);}
-    if(q.t==='pad'){const c=Array.isArray(q.at)?q.at:eqPoint(J,q);front+=cir(c,6.5,C.eq2,' stroke="'+C.eq+'" stroke-width="1"');}
+    if(q.t==='pad'){const c=Array.isArray(q.at)?q.at:eqPoint(J,q);front+=cir(c,6.5,C.pad,' stroke="'+C.bg+'" stroke-width="1.2"');}
   });
   f.eq.forEach(q=>{
     if(q.t==='rail')back+=lnS(q.from,q.to,q.w||4,C.eq2);
     if(q.t==='rect')back+='<rect x="'+q.x+'" y="'+(-(q.y+q.h))+'" width="'+q.w+'" height="'+q.h+'" rx="3" fill="'+C.eq2+'"/>';
     if(q.t==='lever'){const h=eqPoint(J,q);back+=lnS(q.from,h,4,C.eq)+cir(q.from,4,C.eq);}
     if(q.t==='platform'){const c=add(J.an1,q.off||[0,0]);back+=lnS(add(c,dir(q.ang,q.len/2)),sub(c,dir(q.ang,q.len/2)),6,C.eq);}
-    if(q.t==='backpad'){const pts=[];for(let i=0;i<=8;i++){const t=torsoFrame(J,-0.05+1.05*i/8);pts.push(add(t.p,mul(t.back,q.o||16)));}back+=plS(pts,8,C.eq2);}
+    if(q.t==='backpad'){const pts=[];for(let i=0;i<=8;i++){const t=torsoFrame(J,-0.05+1.05*i/8);pts.push(add(t.p,mul(t.back,q.o||16)));}back+=plS(pts,9,C.pad);}
     if(q.t==='grip'){const c=eqPoint(J,q);front+=cir(c,3.6,C.eq,' stroke="'+C.bg+'" stroke-width="1"');}
   });
+  // Each layer: outline pass (wider, line colour) then fill pass, so joints inside a layer show no seams.
+  const layer=(parts,fill,line)=>parts.map(([a,b,w1,w2])=>cap(a,b,w1+2*OW,w2+2*OW,line)).join('')+parts.map(([a,b,w1,w2])=>cap(a,b,w1,w2,fill)).join('');
   // far limbs
-  mid+=cap(J.hipF,J.k2,14,10,C.far)+cap(J.k2,J.an2,10,7,C.far)+cap(J.f2[1],J.f2[0],7,5.5,C.far);
-  mid+=cap(J.shF,J.e2,9.5,7.5,C.far)+cap(J.e2,J.w2,7.5,6,C.far)+cir(J.w2,4,C.far);
-  // torso, neck
-  mid+=cap(J.sh,J.neck,7.5,7,C.fig)+'<path d="'+torsoPath(J)+'" fill="'+C.fig+'"/>';
-  // near leg
-  mid+=cap(J.hipN,J.k1,17.5,13,C.bg)+cap(J.k1,J.an1,13,9.5,C.bg)+cap(J.hipN,J.k1,15,10.5,C.fig)+cap(J.k1,J.an1,10.5,7,C.fig)+cap(J.heel,J.toe,7.5,6,C.shoe);
-  const arm=cap(J.shN,J.e1,12.5,10.5,C.bg)+cap(J.e1,J.w1,10.5,9,C.bg)+cir(J.w1,5.8,C.bg)+cap(J.shN,J.e1,10,8,C.fig)+cap(J.e1,J.w1,8,6.5,C.fig)+cir(J.w1,4.3,C.fig);
+  mid+=layer([[J.hipF,J.k2,14,10],[J.k2,J.an2,10,7],[J.shF,J.e2,9.5,7.5],[J.e2,J.w2,7.5,6],[J.w2,J.w2,8,8]],C.far,C.farLine)+cap(J.f2[1],J.f2[0],7,5.5,C.farLine);
+  // torso, neck, near leg
+  const tp=torsoPath(J);
+  mid+='<path d="'+tp+'" fill="'+C.line+'" stroke="'+C.line+'" stroke-width="'+2*OW+'" stroke-linejoin="round"/>'+[[J.sh,J.neck,7.5,7],[J.hipN,J.k1,15,10.5],[J.k1,J.an1,10.5,7]].map(([a,b,w1,w2])=>cap(a,b,w1+2*OW,w2+2*OW,C.line)).join('');
+  mid+=cap(J.sh,J.neck,7.5,7,C.fig)+'<path d="'+tp+'" fill="'+C.fig+'"/>'+cap(J.hipN,J.k1,15,10.5,C.fig)+cap(J.k1,J.an1,10.5,7,C.fig);
+  mid+=cap(J.heel,J.toe,7.5+OW,6+OW,C.line)+cap(J.heel,J.toe,7.5,6,C.shoe);
+  const arm=layer([[J.shN,J.e1,10,8],[J.e1,J.w1,8,6.5],[J.w1,J.w1,8.6,8.6]],C.fig,C.line);
   const [mBody,mArm]=o.noMuscles?['','']:muscleShapes(J,ex,C);
   f.eq.forEach(q=>{
     if(q.t==='bar'){const c=eqPoint(J,q);front+=cir(c,17,C.plate,' stroke="'+C.bg+'" stroke-width="1.5"')+cir(c,13.5,'none',' stroke="'+C.bg+'" stroke-width="1" opacity=".3"')+cir(c,7,'none',' stroke="'+C.bg+'" stroke-width="1" opacity=".3"')+cir(c,3.5,C.bg)+cir(c,1.6,C.eq);}
-    if(q.t==='db'){const c=eqPoint(J,q);const r=q.r||8;front+=cir(c,r,C.plate,' stroke="'+C.bg+'" stroke-width="1.5"')+cir(c,1.8,C.bg);}
+    if(q.t==='db'){const c=eqPoint(J,q);const r=q.r||8;front+=cir(c,r,C.plate,' stroke="'+C.bg+'" stroke-width="1.5"')+cir(c,r*0.62,'none',' stroke="'+C.bg+'" stroke-width="1" opacity=".3"')+cir(c,1.8,C.bg);}
   });
   const barFirst=f.eq.some(q=>q.t==='bar'&&q.at==='hip');
   let over='';

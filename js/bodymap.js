@@ -41,21 +41,33 @@ function shape(s, cls, m) {
   return '<path d="' + s.d + '"' + a + '/>';
 }
 
-function figure(regions, rec, dx, label) {
+function figure(regions, rec, dx, label, classOf) {
   let out = '<g transform="translate(' + dx + ' 0)">' + base('var(--body-base)');
   for (const m in regions) {
-    const cls = status(rec[m].pct);
+    const cls = classOf ? classOf(m) : status(rec[m].pct);
+    if (!cls) continue;
     for (const s of regions[m]) {
       out += shape(s, cls, m);
       const mir = mirror(s);
       if (s.t === 'e' || s.dm) out += shape(mir, cls, m);
     }
   }
-  return out + '<text x="50" y="228" text-anchor="middle" class="bm-label">' + label + '</text></g>';
+  return out + (label ? '<text x="50" y="228" text-anchor="middle" class="bm-label">' + label + '</text>' : '') + '</g>';
 }
 
 /** SVG with front (left) and back (right) views. Regions carry data-m for taps. */
 export function bodyMap(rec) {
   return '<svg class="bodymap" viewBox="0 0 210 234" role="img" aria-label="Mapa regeneracji mięśni: przód i tył">' +
     figure(FRONT, rec, 0, 'Przód') + figure(BACK, rec, 110, 'Tył') + '</svg>';
+}
+
+/**
+ * Small map of the muscles a workout trains.
+ * @param load {Record<string,number>} weighted sets per muscle
+ */
+export function targetMap(load) {
+  const max = Math.max(1, ...Object.values(load));
+  const classOf = m => (!load[m] ? null : load[m] >= max * 0.5 ? 'hit' : 'sec');
+  return '<svg class="bodymap mini" viewBox="0 0 210 220" role="img" aria-label="Mięśnie w dzisiejszym treningu">' +
+    figure(FRONT, {}, 0, '', classOf) + figure(BACK, {}, 110, '', classOf) + '</svg>';
 }
