@@ -561,15 +561,6 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .welcome{background:var(--surface)}
 .welcome b{font-size:18px}
 
-/* week strip */
-.wstrip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}
-.wd{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
-.wd span{font-size:12px;color:var(--muted);font-weight:500}
-.wd i{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:700;font-size:14px;background:var(--sunk);color:transparent}
-.wd.plan i{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
-.wd.done i{background:var(--ok-fill);color:#fff;box-shadow:none}
-.wd.now span{color:var(--accent);font-weight:700}
-
 /* weekly plan editor */
 .week-list .lrow{min-height:60px}
 .wdname{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--sunk);font-weight:600;font-size:13px;color:var(--muted)}
@@ -623,9 +614,13 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .pe-dayname{font:600 17px var(--body)}
 .stat .v{font:600 22px/1.2 var(--body);font-variant-numeric:tabular-nums}
 .wk-h h3,.empty h3{font:600 18px var(--body)}
-@media (max-width:370px){.mgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.today h2{font-size:26px}.wd i{width:30px;height:30px}}
+@media (max-width:370px){.mgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.today h2{font-size:26px}}
 .ab-t2 .ab-title{font-size:22px}
 :root{--seg-on:#FFFFFF}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--seg-on:#636366}}
 :root[data-theme="dark"]{--seg-on:#636366}
 .seg button[aria-pressed="true"],.stabs button[aria-selected="true"]{background:var(--seg-on)}
+.wdname.now{background:var(--accent);color:#fff}
+.wdname.done{background:var(--ok-fill);color:#fff}
+.hint-p{padding:0 4px}
+.sheet .mgrid{margin-bottom:4px}

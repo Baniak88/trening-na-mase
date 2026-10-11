@@ -244,7 +244,7 @@ function sheetFrame(title, eyebrow, sub, tabs, body) {
 }
 function renderSheet(fresh) {
   const sh = UI.sheet; if (!sh) { closeSheet(); return; }
-  const h = sh.type === 'list' ? listSheet() : sh.type === 'finish' ? finishSheet() : sh.type === 'pick' ? pickSheet() : sh.type === 'muscle' ? muscleSheet() : exSheet();
+  const h = sh.type === 'list' ? listSheet() : sh.type === 'finish' ? finishSheet() : sh.type === 'pick' ? pickSheet() : sh.type === 'muscle' ? muscleSheet() : sh.type === 'day' ? daySheet() : exSheet();
   const prev = $('.sheet') ? $('.sheet').scrollTop : 0;
   $('#sheetRoot').innerHTML = h; document.body.classList.add('lock');
   const sx = $('.sheet'); if (sx) sx.scrollTop = fresh ? 0 : prev;
@@ -326,6 +326,10 @@ function pickSheet() {
   const forPlan = sh.target === 'plan';
   const used = new Set(forPlan ? ((curPlan() || {days: []}).days[sh.d] || {ex: []}).ex.map(e => e.id) : sh.target === 'session' ? (S.draft ? S.draft.ex.map(e => e.id) : []) : (S.today ? S.today.items.map(e => e.id) : []));
   const list = Object.values(EX).filter(ex => usable(ex) && (forPlan || canDo(ex, equip())) && !used.has(ex.id) && (!q || (ex.n + ' ' + ex.en + ' ' + Object.keys(ex.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
+  // Adding to a weekly plan day: exercises for that day's muscles come first.
+  const dm = forPlan ? (((curPlan() || {days: []}).days[sh.d] || {}).mus || []) : [];
+  const hits = ex => primary(ex).some(m => dm.includes(m)) ? 1 : 0;
+  if (dm.length) list.sort((x, y) => hits(y) - hits(x));
   const body = '<input class="search" id="pickQ" type="search" placeholder="Szukaj: nazwa lub partia" value="' + esc(sh.q || '') + '" aria-label="Szukaj ćwiczenia"><ul class="exlist">' +
     list.map(ex => '<li><button class="exrow" data-act="pick-add" data-id="' + ex.id + '"><span class="thumb">' + thumb(ex.id) + '</span><span style="min-width:0"><span class="nm" style="display:block">' + ex.n + '</span><span class="hn" style="display:block">' + KINDN[ex.kind] + ' · ' + primary(ex).map(m => MUSCLES[m]).join(', ') + '</span></span><span class="tg">+</span></button></li>').join('') + '</ul>' +
     (list.length ? '' : '<p class="muted">Nic nie pasuje. Sprawdź sprzęt w profilu „' + esc(profile().name) + '”.</p>');
@@ -357,8 +361,9 @@ $('#sheetRoot').addEventListener('click', ev => {
   if (a === 'finish-yes') { closeSheet(); finish(); return; }
   if (a === 'discard-ask') { openPanel('finish', {mode: 'discard'}); return; }
   if (a === 'discard-yes') { closeSheet(); discard(); return; }
-  if (a === 'pick-open') { openPanel('pick', {target: b.dataset.target, d: +b.dataset.d, q: ''}); return; }
-  if (a === 'pick-add') { const sh = UI.sheet; closeSheet(); addExercise(sh.target, b.dataset.id, sh.d); return; }
+  if (a === 'pick-open') { openPanel('pick', {target: b.dataset.target, d: +b.dataset.d, q: '', wd: UI.sheet.type === 'day' ? UI.sheet.wd : null}); return; }
+  if (a === 'pick-add') { const sh = UI.sheet; closeSheet(); addExercise(sh.target, b.dataset.id, sh.d); if (sh.wd != null) openPanel('day', {wd: sh.wd}); return; }
+  if (a.startsWith('pe-') || a === 'set-pick') { if (a === 'set-pick') closeSheet(); onAct(ev); return; }
   if (a === 'today-remove') { const i = UI.sheet.ctx.idx; S.today.items.splice(i, 1); persistSoon(); closeSheet(); render(); toast('Usunięte z dzisiejszego treningu'); return; }
   if (a === 'exclude') { const id = UI.sheet.id; if (!S.settings.exclude.includes(id)) S.settings.exclude.push(id); S.today = null; persistNow(); closeSheet(); render(); toast('Nie będę proponować: ' + EX[id].n); return; }
   if (a === 'unexclude') { S.settings.exclude = S.settings.exclude.filter(x => x !== UI.sheet.id); S.today = null; persistNow(); renderSheet(false); toast('Znowu w propozycjach'); return; }
@@ -400,7 +405,7 @@ function addExercise(target, id, day) {
 /* ---------- Plan editor helpers ---------- */
 const curPlan = () => S.customPlans.find(c => c.id === UI.pe);
 function openPlanEditor(id) { UI.pe = id; UI.peOpen = null; UI.peDel = null; UI.sub = 'planedit'; render(); window.scrollTo(0, 0); }
-function planChanged() { S.today = null; persistNow(); render(); }
+function planChanged() { S.today = null; persistNow(); render(); if (UI.sheet && UI.sheet.type === 'day') renderSheet(false); }
 function subBack() { UI.peWd = null; UI.sub = UI.sub === 'planedit' ? 'settings' : UI.sub === 'know' && UI.fromSettings ? 'settings' : null; UI.peDel = null; render(); window.scrollTo(0, 0); }
 function planLoad(days) { const v = {}; days.forEach(d => d.ex.forEach(e => { const m = (EX[e.id] || {}).m || {}; for (const k in m) v[k] = (v[k] || 0) + m[k] * e.sets; })); return v; }
 
@@ -415,27 +420,55 @@ const chipRow = (act, opts, cur, label) => '<div class="chips" role="group" aria
 const setsWord = n => n + ' ' + (n === 1 ? 'seria' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'serie' : 'serii');
 const sameDay = (iso, d = new Date()) => dayStamp(new Date(iso)) === dayStamp(d);
 /** Mon–Sun strip: planned days, trained days and today. */
-function weekStrip() {
-  const p = S.settings.mode === 'plan' ? plan() : null; const ws = weekStart(); const today = weekdayOf();
+/* Weekly plan shown and edited on the home screen. */
+const weekPlanObj = () => S.customPlans.find(c => c.week && c.id === S.settings.plan) || S.customPlans.find(c => c.week) || null;
+function ensureWeekPlan() {
+  let c = weekPlanObj();
+  if (!c) { c = {id: 'c' + Date.now().toString(36), name: 'Mój tydzień', week: true, days: []}; S.customPlans.push(c); }
+  return c;
+}
+function useWeekPlan(c) {
+  if (S.settings.mode === 'plan' && S.settings.plan === c.id) return;
+  S.settings.mode = 'plan'; S.settings.plan = c.id; S.settings.next = 0; S.settings.dayPick = null; S.settings.welcomed = true; S.today = null;
+  toast('Trenujesz według planu tygodnia');
+}
+function weekList() {
+  const c = weekPlanObj(); const ws = weekStart(); const today = weekdayOf();
   const done = new Set(S.workouts.filter(w => new Date(w.date) >= ws).map(w => weekdayOf(new Date(w.date))));
-  return '<div class="wstrip" role="list" aria-label="Ten tydzień">' + WD_SHORT.map((l, wd) => {
-    const pd = p && p.week ? p.days.find(d => d.wd === wd) : null;
-    const cls = (done.has(wd) ? ' done' : '') + (pd ? ' plan' : '') + (wd === today ? ' now' : '');
-    return '<div class="wd' + cls + '" role="listitem" aria-label="' + WEEKDAYS[wd] + (done.has(wd) ? ', trening zrobiony' : pd ? ', ' + pd.name : '') + '"><span>' + l + '</span><i>' + (done.has(wd) ? '✓' : '') + '</i></div>';
-  }).join('') + '</div>';
+  const using = c && S.settings.mode === 'plan' && S.settings.plan === c.id;
+  let h = '<section class="stack" style="gap:8px"><div class="sec-h">' + (c && c.days.length ? 'Twój tydzień' : 'Zaplanuj tydzień') + '</div>';
+  if (!c || !c.days.length) h += '<p class="muted small hint-p">Dotknij dnia i zaznacz partie mięśni, np. poniedziałek: klatka i biceps. Ćwiczenia dobiorą się same.</p>';
+  h += '<ul class="list week-list">' + WEEKDAYS.map((wn, wd) => {
+    const d = c && c.days.find(x => x.wd === wd);
+    return '<li><button class="lrow" data-act="day-open" data-v="' + wd + '"><span class="wdname' + (done.has(wd) ? ' done' : wd === today ? ' now' : '') + '">' + (done.has(wd) ? '✓' : WD_SHORT[wd]) + '</span><span class="lmain"><b>' + wn + (wd === today ? ' · dziś' : '') + '</b><span>' + (d ? esc(d.mus.map(m => MUSCLES[m]).join(', ')) + ' · ' + d.ex.length + ' ćw.' : 'Odpoczynek') + '</span></span><span class="chev" aria-hidden="true">›</span></button></li>';
+  }).join('') + '</ul>';
+  if (c && c.days.length && !using) h += '<button class="btn wide" data-act="week-use">Trenuj według planu tygodnia</button>';
+  return h + '</section>';
+}
+/** Sheet for one weekday: muscle groups, then the exercises filled in for them. */
+function daySheet() {
+  const wd = UI.sheet.wd; const c = weekPlanObj(); const di = c ? c.days.findIndex(x => x.wd === wd) : -1; const d = di >= 0 ? c.days[di] : null;
+  let h = '<div class="eyebrow">Partie mięśni</div><div class="mgrid" role="group" aria-label="Partie mięśni">' + TRAINABLE.map(m => '<button class="mtog" data-act="pe-mus" data-wd="' + wd + '" data-m="' + m + '" aria-pressed="' + !!(d && d.mus.includes(m)) + '">' + MUSCLES[m] + '</button>').join('') + '</div>';
+  if (d) {
+    h += '<div class="eyebrow">Ćwiczenia · dotknij, żeby zmienić serie i powtórzenia</div>' + peExList(d, di) +
+      '<div class="row"><button class="btn sm" data-act="pick-open" data-target="plan" data-d="' + di + '">+ Dodaj ćwiczenie</button><button class="btn sm ghost" data-act="pe-refill" data-d="' + di + '">↻ Dobierz inne</button></div>' +
+      '<button class="btn primary big" data-act="sheet-close">Gotowe</button>' +
+      (wd !== weekdayOf() && d.ex.length ? '<button class="btn ghost wide" data-act="set-pick" data-v="' + di + '">Zrób ten trening dziś</button>' : '');
+  } else h += '<p class="muted small">Zaznacz jedną lub kilka partii. Dobiorę ćwiczenia, przy których badania pokazały przyrost mięśni. Bez zaznaczenia to dzień wolny.</p>';
+  return sheetFrame(WEEKDAYS[wd], 'Plan tygodnia', d ? d.ex.length + ' ćwiczeń · ok. ' + estMin(d.ex, false) + ' min' : 'Odpoczynek', '', h);
 }
 function viewHome() {
   const t = ensureToday(); const st = S.settings; const wk = cycleWeek(); const cy = CYCLE[wk]; const p = plan();
   const weekPlan = t.mode === 'plan' && p.week;
   let h = '<div class="stack">';
-  if (!st.welcomed) h += '<section class="card welcome"><b>Witaj w Twoim Trenerze</b><p class="small">Zaplanuj tydzień: wybierz dni i partie mięśni, a ćwiczenia dobiorą się same. Proponuję tylko ćwiczenia, przy których badania pokazały przyrost mięśni. Ciężary podpowiadam z Twojej historii.</p><div class="row"><button class="btn sm primary" data-act="plan-new">Zaplanuj tydzień</button><button class="btn sm ghost" data-act="welcomed">Później</button></div></section>';
+  if (!st.welcomed) h += '<section class="card welcome"><b>Witaj w Twoim Trenerze</b><p class="small">Zaplanuj tydzień: wybierz dni i partie mięśni, a ćwiczenia dobiorą się same. Proponuję tylko ćwiczenia, przy których badania pokazały przyrost mięśni. Ciężary podpowiadam z Twojej historii.</p><div class="row"><button class="btn sm primary" data-act="day-open" data-v="' + weekdayOf() + '">Zaplanuj tydzień</button><button class="btn sm ghost" data-act="welcomed">Później</button></div></section>';
   if (UI.summary) { const w = UI.summary; h += '<section class="card summary"><h3>Trening zapisany</h3><p>' + esc(w.dayName) + ' · ' + setsWord(w.ex.reduce((a, q) => a + q.sets.length, 0)) + ' · ' + fmt(Math.round(volume(w))) + ' kg</p>' + (w.prs.length ? '<div class="row">' + w.prs.map(q => '<span class="chip pr">Rekord: ' + EX[q].n + '</span>').join('') + '</div>' : '') + '</section>'; }
   if (t.rest) {
     const n = t.next ? p.days[t.next.idx] : null;
     const trained = S.workouts.some(w => sameDay(w.date));
     h += '<section class="card today"><div class="eyebrow">' + WEEKDAYS[t.wd] + '</div><h2>Dzień wolny</h2><p class="muted">' + (trained ? 'Dziś już trenowałeś.' : 'Mięśnie rosną, kiedy odpoczywasz.') + (n ? ' Następny trening: <b>' + WEEKDAYS[n.wd].toLowerCase() + '</b>, ' + esc(n.name) + '.' : '') + '</p>' +
       (n && !trained ? '<button class="btn wide" data-act="set-pick" data-v="' + t.next.idx + '">Trenuj dziś: ' + esc(n.name) + '</button>' : '') + '</section>';
-    h += '<section class="card">' + weekStrip() + '</section>';
+    h += weekList();
     return h + '</div>';
   }
   const doneToday = weekPlan && S.workouts.some(w => sameDay(w.date) && w.plan === st.plan && w.day === t.day);
@@ -469,7 +502,7 @@ function viewHome() {
     return '<li><button class="lrow" data-act="today-ex" data-id="' + it.id + '" data-idx="' + i + '"><span class="thumb">' + thumb(it.id) + '</span><span class="lmain"><b>' + ex.n + '</b><span>' + n + ' × ' + range(ex, it) + (tgt ? ' · <em class="' + (sg.up ? 'up' : '') + '">' + (sg.up ? '↑ ' : '') + tgt + '</em>' : '') + '</span>' + (note ? '<span class="sub-note">' + esc(note) + '</span>' : '') + '</span><span class="chev" aria-hidden="true">›</span></button></li>';
   }).join('') + '</ul>' + (t.items.length ? '' : '<p class="muted card">Brak ćwiczeń dla tego sprzętu. Zmień siłownię albo partie w planie.</p>') +
     '<div class="row today-actions">' + (t.mode === 'auto' ? '<button class="btn sm" data-act="shuffle">↻ Inne ćwiczenia</button>' : '') + '<button class="btn sm ghost" data-act="pick-open" data-target="today">+ Dodaj ćwiczenie</button></div></section>';
-  h += '<section class="card">' + weekStrip() + '</section>';
+  h += weekList();
   return h + '</div>';
 }
 function goEx(i) { const d = S.draft; if (!d) return; if (i >= d.ex.length) { openPanel('finish', {mode: 'finish'}); return; } i = Math.max(0, i); UI.cur = i; UI.sel = null; INL.t = 0; render(); window.scrollTo({top: 0, behavior: REDUCED ? 'auto' : 'smooth'}); }
@@ -591,7 +624,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Twój Trener · wersja 1.4 · <a href="https://github.com/Baniak88/trening-na-mase" target="_blank" rel="noopener">kod na GitHubie</a></p>';
+  h += '<p class="muted small center">Twój Trener · wersja 1.5</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -680,7 +713,7 @@ function viewKnow() {
   return '<div class="stack"><section class="card"><ul class="rules">' + R2.map(r => '<li><span class="big mono">' + r[0] + '</span><div><b>' + r[1] + '</b><p>' + r[2] + '</p></div></li>').join('') + '</ul></section>' +
     '<section class="card stack" style="gap:10px"><div class="sec-t">Wzorce ruchowe</div><p class="muted small">Kursy trenerskie uczą układać plan wokół wzorców ruchu. Generator najpierw wybiera ćwiczenia wielostawowe dla każdego wzorca, potem izolacje dla partii, którym brakuje serii.</p><div class="pat">' +
     [['Przysiad', 'przysiad, hack, suwnica'], ['Zawias biodrowy', 'martwy ciąg, RDL, hip thrust'], ['Wykrok', 'wykroki, bułgarski'], ['Pchanie poziome', 'wyciskanie, maszyna, pompki'], ['Pchanie pionowe', 'żołnierskie, hantle, maszyna'], ['Przyciąganie poziome', 'wiosłowania'], ['Przyciąganie pionowe', 'podciąganie, wyciąg'], ['Izolacje', 'barki, ramiona, uda, łydki']].map(([a, b]) => '<div><b>' + a + '</b>' + b + '</div>').join('') + '</div></section>' +
-    '<section class="card stack" style="gap:10px"><div class="sec-t">Tylko ćwiczenia z badaniami przyrostu</div><p class="small">Aplikacja proponuje ' + Object.values(EX).filter(usable).length + ' ćwiczeń. <span class="evb A">A</span> to ćwiczenie samo trenowane w badaniu, które zmierzyło przyrost mięśni. <span class="evb B">B</span> to bliski wariant (ten sam ruch, inny sprzęt) albo program treningowy z tym ćwiczeniem, w którym mięśnie urosły. Wolne ciężary i maszyny dają podobny przyrost. Ukryte zostały ćwiczenia bez takich danych: face pull, odwrotne rozpiętki, rozpiętki, pompki na poręczach, uginanie młotkowe, ściąganie prostych rąk, wejścia na skrzynię, deska, spięcia, unoszenie nóg i spacer farmera.</p><ol class="src">' + Object.values(SOURCES).map(x => '<li><a href="' + x[1] + '" target="_blank" rel="noopener">' + x[0] + '</a></li>').join('') + '</ol></section>' +
+    '<section class="card stack" style="gap:10px"><div class="sec-t">Tylko ćwiczenia z badaniami przyrostu</div><p class="small">Aplikacja proponuje ' + Object.values(EX).filter(usable).length + ' ćwiczeń. <span class="evb A">A</span> to ćwiczenie samo trenowane w badaniu, które zmierzyło przyrost mięśni. <span class="evb B">B</span> to bliski wariant (ten sam ruch, inny sprzęt) albo program treningowy z tym ćwiczeniem, w którym mięśnie urosły. Wolne ciężary i maszyny dają podobny przyrost. Ukryte zostały ćwiczenia bez takich danych: face pull, odwrotne rozpiętki, pompki na poręczach, uginanie młotkowe, ściąganie prostych rąk, wejścia na skrzynię, deska, spięcia, unoszenie nóg i spacer farmera.</p><ol class="src">' + Object.values(SOURCES).map(x => '<li><a href="' + x[1] + '" target="_blank" rel="noopener">' + x[0] + '</a></li>').join('') + '</ol></section>' +
     '<section class="card stack" style="gap:12px"><div class="sec-t">Dieta i regeneracja</div><p class="small">Trening daje sygnał do wzrostu, ale mięśnie rosną przy nadwyżce ok. 300 kcal i 1,6–2,0 g białka na kg masy ciała. Śpij 7–9 godzin.</p>' +
     '<div class="calc"><div class="field"><label for="bw">Masa ciała, kg</label><input id="bw" inputmode="decimal" value="' + fmt(bw) + '"></div><div><div class="field"><label>Białko dziennie</label></div><div class="out" id="prot">' + protein(bw) + '</div></div></div></section>' +
     '<section class="card stack" style="gap:8px"><div class="sec-t">Źródła</div><ol class="src">' + SRC.map(s => '<li><a href="' + s[1] + '" target="_blank" rel="noopener">' + s[0] + '</a></li>').join('') + '</ol></section></div>';
@@ -742,10 +775,13 @@ function onAct(ev) {
     case 'set-mode': setting('mode', v); render(); break;
     case 'set-plan': setting('plan', v); setting('next', 0); S.today = null; render(); toast('Plan: ' + allPlans()[v].name); break;
     case 'plan-new': { const c = {id: 'c' + Date.now().toString(36), name: 'Mój tydzień', week: true, days: []}; S.customPlans.push(c); setting('welcomed', true); persistNow(); openPlanEditor(c.id); UI.peWd = weekdayOf(); render(); break; }
+    case 'day-open': { const c = weekPlanObj(); UI.pe = c ? c.id : null; UI.peOpen = null; openPanel('day', {wd: +v}); break; }
+    case 'week-use': { const c = weekPlanObj(); if (c) { useWeekPlan(c); persistNow(); render(); } break; }
     case 'set-pick': setting('dayPick', {stamp: dayStamp(), idx: +v}); S.today = null; UI.cfgOpen = false; render(); window.scrollTo(0, 0); break;
     case 'pe-wd': { const wd = +v; UI.peWd = UI.peWd === wd ? null : wd; UI.peOpen = null; render(); break; }
     case 'pe-mus': {
-      const c = curPlan(); const wd = +b.dataset.wd; const m = b.dataset.m; let d = c.days.find(x => x.wd === wd);
+      const fromHome = UI.sheet && UI.sheet.type === 'day';
+      const c = fromHome ? ensureWeekPlan() : curPlan(); if (fromHome) { UI.pe = c.id; useWeekPlan(c); } const wd = +b.dataset.wd; const m = b.dataset.m; let d = c.days.find(x => x.wd === wd);
       const mus = d ? (d.mus.includes(m) ? d.mus.filter(x => x !== m) : d.mus.concat(m)) : [m];
       if (!mus.length) c.days = c.days.filter(x => x !== d);
       else { if (!d) { d = {wd, mus: [], name: '', ex: []}; c.days.push(d); } d.mus = mus; d.name = dayName(mus); d.ex = fillDay(mus, {equipment: equip(), exclude: S.settings.exclude}); }

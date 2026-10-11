@@ -139,3 +139,18 @@ test('weekly planner fills a day with the chosen muscles', async () => {
   assert.equal(nextDay(days, 4).inDays, 3, 'Friday to Monday');
   assert.equal(weekdayOf(new Date(2026, 9, 12)), 0, '12 Oct 2026 is a Monday');
 });
+
+test('every muscle group has a wide choice of evidence-backed exercises', async () => {
+  const {usable, primary, TRAINABLE, SOURCES} = await import('../js/data/catalog.js');
+  const u = Object.values(EX).filter(usable);
+  assert.ok(u.length >= 70, 'usable ' + u.length);
+  for (const m of TRAINABLE) {
+    const n = u.filter(e => primary(e).includes(m)).length;
+    assert.ok(n >= (m === 'calves' ? 4 : 8), m + ' has ' + n);
+  }
+  for (const e of u) {
+    assert.ok(SOURCES[e.ev.s], e.id + ' source');
+    assert.ok(e.fig.A && e.fig.B && e.cues.length && e.err.length, e.id + ' content');
+    for (const a of e.alt) assert.ok(EX[a], e.id + ' alt ' + a);
+  }
+});

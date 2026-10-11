@@ -32,18 +32,19 @@ export function exercisesFor(m, count) {
   return count <= 2 ? 2 : 1;
 }
 
-function score(ex, slot, picked, rand) {
-  let s = rand() * 0.4;
-  if (ex.ev && ex.ev.l === 'A') s += 1;
+function score(ex, m, slot, picked, rand, seed) {
+  let s = rand() * (seed === 1 ? 0.6 : 2.6);
+  if (ex.ev && ex.ev.l === 'A') s += 0.8;
   const compound = isCompound(ex);
-  if (slot === 0) s += compound ? 1.5 : 0;
-  else s += compound ? 0 : 0.8;
-  if (picked.some(p => p.p === ex.p && compound)) s -= 1.2;
-  if (!compound && picked.some(p => !isCompound(p) && p.kind === ex.kind && primary(p).join() === primary(ex).join())) s -= 1;
+  // Large muscles: two multi-joint lifts, then isolation. Shoulders: a press, then raises. Arms and calves: isolation.
+  const wantCompound = BIG.includes(m) ? slot < 2 : m === 'delts' ? slot === 0 : false;
+  if (compound === wantCompound) s += 1.5;
+  if (compound && picked.some(p => isCompound(p) && p.p === ex.p)) s -= 0.6; // e.g. a row after a pulldown
+  if (!compound && picked.some(p => !isCompound(p) && primary(p).join() === primary(ex).join())) s -= 0.5;
+  if (picked.some(p => p.kind === ex.kind)) s -= 0.4;
   if (ACCESSORY.includes(ex.id)) s -= 1.3;
   if (ex.id === 'seatedcalf') s -= 0.3; // standing raises grew the calves more (Kinoshita 2023)
-  if (picked.some(p => p.kind === ex.kind)) s -= 0.4;
-  if (slot === 0) s += {bar: 0.5, db: 0.3, machine: 0.2, cable: 0.1, bw: 0}[ex.kind] || 0;
+  if (slot === 0 && compound) s += {bar: 0.5, db: 0.3, machine: 0.2, cable: 0.1, bw: 0}[ex.kind] || 0;
   return s;
 }
 
@@ -71,7 +72,7 @@ export function fillDay(muscles, {equipment = [], exclude = [], seed = 1} = {}) 
       const cand = pool.filter(ex => !used.has(ex.id) && primary(ex).includes(m));
       if (!cand.length) break;
       let best = null, bestS = -Infinity;
-      for (const ex of cand) { const s = score(ex, picked.length, picked, rand); if (s > bestS) { bestS = s; best = ex; } }
+      for (const ex of cand) { const s = score(ex, m, picked.length, picked, rand, seed); if (s > bestS) { bestS = s; best = ex; } }
       used.add(best.id); picked.push(best);
       out.push({id: best.id, m});
       for (const k of primary(best)) if (need[k] != null) need[k]--;

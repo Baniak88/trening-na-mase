@@ -1,4 +1,4 @@
-/* Exercise catalog: 50 exercises (38 with evidence of muscle growth) with technique figures, coaching marks and faults. Ported from the prototype. */
+/* Exercise catalog: 84 exercises (74 with evidence of muscle growth) with technique figures, coaching marks and faults. Ported from the prototype. */
 /* ---------- Muscles, exercises, plans ---------- */
 const MUSCLES={chest:'Klatka',back:'Plecy',delts:'Barki',biceps:'Biceps',triceps:'Triceps',quads:'Czworogłowe',hams:'Dwugłowe ud',glutes:'Pośladki',calves:'Łydki',abs:'Brzuch'};
 const PATTERNS=[['knee','Przysiad i wykrok'],['hinge','Zawias biodrowy'],['hpush','Pchanie poziome'],['vpush','Pchanie pionowe'],['hpull','Przyciąganie poziome'],['vpull','Przyciąganie pionowe'],['iso','Izolacja: ramiona, barki, nogi'],['core','Core i noszenie']];
@@ -525,6 +525,173 @@ const ANN2={
 };
 for(const id in ANN2)Object.assign(EX[id].fig,ANN2[id]);
 
+/* ---------- More exercises (1.5) ----------
+   Variants reuse a base exercise's figure, phases and fault modes; fig overrides replace whole keys. */
+const deep=o=>JSON.parse(JSON.stringify(o));
+const SMITH=x=>({t:'rail',from:[x,0],to:[x,178],w:3});
+function variant(id,base,o){
+  const fig=Object.assign(base?deep(EX[base].fig):{},o.fig||{});
+  EX[id]={...o,fig};
+}
+/* chest */
+variant('inclinebar','incline',{n:'Wyciskanie sztangi na skosie',en:'Incline barbell press',p:'hpush',kind:'bar',inc:2.5,m:{chest:1,delts:0.5,triceps:0.5},
+ cues:['Ławka 30–45°, łopatki ściągnięte i wciśnięte w oparcie','Gryf schodzi do górnej części klatki','Przedramiona pionowo pod gryfem','Wyciskaj w górę nad barki'],
+ err:['Za wysoki kąt ławki: pracują głównie barki','Odbijanie gryfu od klatki'],alt:['incline','smithincl'],
+ fig:{eq:[{t:'bench',pts:[[40,42],[6,42],[-34,74]]},{t:'bar',at:'hand'}]}});
+variant('smithbench','bench',{n:'Wyciskanie na suwnicy Smitha',en:'Smith machine bench press',p:'hpush',kind:'machine',inc:2.5,m:{chest:1,triceps:0.5,delts:0.5},
+ cues:['Ławka ustawiona tak, by gryf schodził na dół mostka','Łopatki ściągnięte, stopy w podłodze','Opuszczaj 2–3 s, bez odbijania'],
+ err:['Ławka źle ustawiona: gryf trafia w szyję albo brzuch','Łokcie rozstawione na 90°'],alt:['bench','chestpress'],
+ fig:{eq:[{t:'bench',pts:[[-78,46],[30,46]]},SMITH(-30),{t:'bar',at:'hand'}]}});
+variant('smithincl','incline',{n:'Wyciskanie na skosie na suwnicy Smitha',en:'Smith machine incline press',p:'hpush',kind:'machine',inc:2.5,m:{chest:1,delts:0.5,triceps:0.5},
+ cues:['Ławka 30–45° tak, by gryf schodził na górę klatki','Łopatki przy oparciu','Pełny zakres, powolne opuszczanie'],
+ err:['Gryf ląduje na szyi','Pośladki odrywają się od ławki'],alt:['inclinebar','incline'],
+ fig:{eq:[{t:'bench',pts:[[40,42],[6,42],[-34,74]]},SMITH(-22),{t:'bar',at:'hand'}]}});
+variant('inclinemach','chestpress',{n:'Wyciskanie na skosie na maszynie',en:'Incline machine press',p:'hpush',kind:'machine',inc:5,m:{chest:1,delts:0.5,triceps:0.5},
+ cues:['Siedzisko tak, by uchwyty były na wysokości górnej części klatki','Plecy i łopatki przy oparciu','Wyciskaj w górę i do przodu'],
+ err:['Uchwyty za wysoko: pracują głównie barki','Skrócony zakres przy klatce'],alt:['incline','chestpress'],
+ fig:{sA:['Start','Uchwyty przy górnej części klatki, łopatki przy oparciu.'],sB:['Wyprost','Wyciśnij w górę i do przodu, łokcie prawie proste.']}});
+/* back */
+variant('chinup','pullup',{n:'Podciąganie podchwytem',en:'Chin-up',p:'vpull',kind:'bw',inc:2.5,m:{back:1,biceps:0.5},
+ cues:['Chwyt podchwytem na szerokość barków','Zacznij z pełnego zwisu','Klatka do drążka, łokcie w dół'],
+ err:['Półpowtórzenia bez pełnego zwisu','Bujanie nogami'],alt:['pullup','closepull']});
+variant('closepull','latpull',{n:'Ściąganie wąskim uchwytem',en:'Close-grip pulldown',p:'vpull',kind:'cable',inc:5,m:{back:1,biceps:0.5},
+ cues:['Uchwyt V lub wąski, ręce w pełni wyprostowane u góry','Ściągaj do górnej części klatki','Łokcie prowadź w dół wzdłuż tułowia'],
+ err:['Mocne odchylanie tułowia','Skrócony powrót u góry'],alt:['latpull','chinup']});
+variant('onearmpull','latpull',{n:'Ściąganie jednorącz na wyciągu',en:'Single-arm lat pulldown',p:'vpull',kind:'cable',inc:2.5,uni:1,m:{back:1,biceps:0.5},
+ cues:['Uchwyt jednorącz, ręka w pełni wyprostowana u góry','Łokieć w dół do biodra','Tułów nie skręca się'],
+ err:['Skręcanie tułowia','Ciągnięcie samym bicepsem'],alt:['latpull','closepull']});
+variant('tbar','row',{n:'Wiosłowanie T-bar',en:'T-bar row',p:'hpull',kind:'bar',inc:2.5,m:{back:1,biceps:0.5},
+ cues:['Tułów pochylony, plecy proste','Uchwyt do dołu klatki','Łopatki ściągaj na końcu ruchu'],
+ err:['Prostowanie tułowia przy każdym powtórzeniu','Zaokrąglone plecy'],alt:['row','cablerow']});
+variant('onearmrow','cablerow',{n:'Wiosłowanie jednorącz na wyciągu',en:'Single-arm cable row',p:'hpull',kind:'cable',inc:2.5,uni:1,m:{back:1,biceps:0.5},
+ cues:['Siedząc, uchwyt jednorącz, ręka wyprostowana','Łokieć wzdłuż tułowia do biodra','Na początku pozwól łopatce wysunąć się do przodu'],
+ err:['Skręcanie tułowia zamiast ruchu ręką','Odchylanie się w tył'],alt:['cablerow','dbrow']});
+/* shoulders */
+variant('arnold','dbohp',{n:'Wyciskanie Arnolda',en:'Arnold press',p:'vpush',kind:'db',inc:2,m:{delts:1,triceps:0.5},
+ cues:['Start: hantle przed twarzą, dłonie do siebie','W trakcie wyciskania obracaj dłonie na zewnątrz','Na górze ręce nad barkami'],
+ err:['Wyginanie lędźwi','Za ciężkie hantle, skrócony zakres'],alt:['dbohp','ohp']});
+variant('seatedlat',null,{n:'Unoszenie bokiem siedząc',en:'Seated lateral raise',p:'iso',kind:'db',inc:1,m:{delts:1},
+ cues:['Siedząc prosto, hantle przy biodrach','Unoś bokiem do wysokości barków','Łokieć lekko ugięty, prowadzi ruch'],
+ err:['Unoszenie wyżej niż barki z zarzutem','Bujanie tułowiem'],alt:['latraise','cablelat'],
+ fig:{front:1,ecc:'BA',hl:['ua'],eq:FRONT_SEAT.concat([{t:'db',at:'hand',r:6},{t:'db',at:'hand2',r:6}]),
+  A:{a:[9,4],hip:[0,48],t:90,seatF:1,armA:[-82,-86],h:90},B:{a:[9,4],hip:[0,48],t:90,seatF:1,armA:[2,-4],h:90},
+  sA:['Start','Siedzisz prosto, hantle przy biodrach, łokcie lekko ugięte.'],sB:['Góra','Ręce do wysokości barków, łokieć lekko wyżej niż dłoń.'],
+  marks:[{t:'hline',j:'sh',n:1,ph:'B',l:'Dłonie do wysokości barków, nie wyżej'}],bad:[]}});
+variant('smithohp','dbohp',{n:'Wyciskanie nad głowę na suwnicy Smitha',en:'Smith machine shoulder press',p:'vpush',kind:'machine',inc:2.5,m:{delts:1,triceps:0.5},
+ cues:['Siedząc, ławka prawie pionowo, gryf przed twarzą','Opuszczaj do wysokości brody','Wyciskaj pionowo, plecy przy oparciu'],
+ err:['Odchylanie się i wyginanie lędźwi','Skrócony zakres'],alt:['dbohp','machpress'],
+ fig:{eq:SEAT.concat([SMITH(16),{t:'bar',at:'hand'}])}});
+/* biceps */
+variant('preacher',null,{n:'Uginanie na modlitewniku',en:'Preacher curl',p:'iso',kind:'db',inc:1,m:{biceps:1},
+ cues:['Ramię oparte całe na pulpicie, pacha przy krawędzi','Opuszczaj prawie do pełnego wyprostu','Unoś bez odrywania ramienia'],
+ err:['Odrywanie łokcia od pulpitu','Skrócony zakres na dole'],alt:['curl','inclinecurl'],
+ fig:{ecc:'BA',hl:['fa'],eq:SEAT.concat([{t:'rail',from:[30,58],to:[30,0],w:4},{t:'bench',pts:[[3,86],[30,58]],noLegs:true},{t:'db',at:'hand'}]),
+  A:{a:[44,4],hip:[0,46],t:84,armA:[-48,-62],h:75},B:{a:[44,4],hip:[0,46],t:84,armA:[-48,72],h:75},
+  sA:['Dół','Ramię na pulpicie, ręka prawie wyprostowana.'],sB:['Góra','Zegnij rękę do pionu przedramienia, ramię zostaje na pulpicie.'],
+  marks:[],bad:[]}});
+variant('barcurl','curl',{n:'Uginanie ramion ze sztangą',en:'Barbell curl',p:'iso',kind:'bar',inc:2.5,m:{biceps:1},
+ cues:['Chwyt podchwytem na szerokość barków','Łokcie przy tułowiu, nieruchomo','Opuszczaj do pełnego wyprostu'],
+ err:['Bujanie tułowiem','Łokcie wędrują do przodu'],alt:['curl','ezcurl'],fig:{eq:[{t:'bar',at:'hand'}]}});
+variant('ezcurl','curl',{n:'Uginanie ze sztangą łamaną',en:'EZ-bar curl',p:'iso',kind:'bar',inc:2.5,m:{biceps:1},
+ cues:['Chwyt za wewnętrzne łamanie gryfu','Łokcie przy tułowiu','Pełny zakres, powolne opuszczanie'],
+ err:['Bujanie tułowiem','Skrócony zakres na dole'],alt:['barcurl','curl'],fig:{eq:[{t:'bar',at:'hand'}]}});
+variant('conc',null,{n:'Uginanie w skupieniu',en:'Concentration curl',p:'iso',kind:'db',inc:1,uni:1,m:{biceps:1},
+ cues:['Siedząc, łokieć oparty o wewnętrzną stronę uda','Opuszczaj do pełnego wyprostu','Unoś bez ruszania ramieniem'],
+ err:['Pomaganie sobie tułowiem','Łokieć zsuwa się z uda'],alt:['curl','preacher'],
+ fig:{ecc:'BA',hl:['fa'],eq:SEAT.concat([{t:'db',at:'hand'}]),
+  A:{a:[40,4],hip:[0,46],t:58,armA:[-84,-86],h:40},B:{a:[40,4],hip:[0,46],t:58,armA:[-84,82],h:40},
+  sA:['Dół','Łokieć przy wewnętrznej stronie uda, ręka wyprostowana.'],sB:['Góra','Zegnij rękę, ramię zostaje nieruchomo.'],
+  marks:[],bad:[]}});
+variant('cablecurl1','cablecurl',{n:'Uginanie jednorącz na wyciągu',en:'Single-arm cable curl',p:'iso',kind:'cable',inc:2.5,uni:1,m:{biceps:1},
+ cues:['Przodem do dolnego wyciągu, uchwyt jednorącz','Łokieć przy tułowiu','Pełny wyprost na dole'],
+ err:['Łokieć wędruje do przodu','Bujanie tułowiem'],alt:['cablecurl','curl']});
+/* triceps */
+variant('cgbench','bench',{n:'Wyciskanie wąsko',en:'Close-grip bench press',p:'hpush',kind:'bar',inc:2.5,m:{triceps:1,chest:0.5,delts:0.5},
+ cues:['Chwyt na szerokość barków','Łokcie blisko tułowia','Gryf schodzi do dołu mostka'],
+ err:['Za wąski chwyt obciąża nadgarstki','Łokcie rozstawione na boki'],alt:['skull','pushdown']});
+variant('pushdown1','pushdown',{n:'Prostowanie jednorącz na wyciągu',en:'Single-arm pushdown',p:'iso',kind:'cable',inc:2.5,uni:1,m:{triceps:1},
+ cues:['Łokieć przy boku, nieruchomo','Pełny wyprost w dół','Powolny powrót'],
+ err:['Łokieć wędruje do przodu','Pochylanie się nad uchwytem'],alt:['pushdown','ropeoh']});
+variant('ezskull','skull',{n:'Wyciskanie francuskie sztangą łamaną',en:'EZ-bar skull crusher',p:'iso',kind:'bar',inc:2.5,m:{triceps:1},
+ cues:['Leżąc, gryf nad czołem na prostych rękach','Opuszczaj za głowę, łokcie nieruchomo','Ramiona lekko odchylone w stronę głowy'],
+ err:['Łokcie rozjeżdżają się na boki','Ruch w barkach zamiast w łokciach'],alt:['skull','ropeoh'],fig:{eq:[{t:'bench',pts:[[-78,46],[30,46]]},{t:'bar',at:'hand'}]}});
+variant('triext1','triext',{n:'Wyprost jednorącz nad głową',en:'Single-arm overhead extension',p:'iso',kind:'db',inc:1,uni:1,m:{triceps:1},
+ cues:['Hantla nad głową, ramię przy uchu','Opuszczaj głęboko za głowę','Łokieć skierowany w górę'],
+ err:['Łokieć ucieka w bok','Wyginanie lędźwi'],alt:['triext','ropeoh'],fig:{eq:[{t:'db',at:'hand',r:8}]}});
+/* quads */
+variant('frontsquat','squat',{n:'Przysiad przedni',en:'Front squat',p:'knee',kind:'bar',inc:2.5,m:{quads:1,glutes:1},
+ cues:['Gryf na przednich barkach, łokcie wysoko','Tułów bardziej pionowo niż w przysiadzie klasycznym','Zejdź co najmniej do równoległej'],
+ err:['Łokcie opadają i gryf zjeżdża','Pięty odrywają się od podłogi'],alt:['squat','goblet'],
+ fig:{A:{a:[0,4],hip:[0,89],t:90,hand:{sh:[10,4]},es:-1,h:90},B:{a:[0,4],hip:[-18,36],t:66,hand:{sh:[10,4]},es:-1,h:80},
+  marks:[{t:'vline',j:'mid',n:1,l:'Gryf nad środkiem stopy'},{t:'angle',j:'hip',a:'sh',b:'k1',n:2,ph:'B',l:'Tułów wyprostowany, łokcie wysoko'}],bad:[]}});
+variant('smithsquat','squat',{n:'Przysiad na suwnicy Smitha',en:'Smith machine squat',p:'knee',kind:'machine',inc:2.5,m:{quads:1,glutes:1},
+ cues:['Stopy lekko przed gryfem','Zejdź co najmniej do równoległej','Kolana podążają nad palcami'],
+ err:['Stopy za daleko z tyłu: ból kolan','Za płytko'],alt:['squat','hack'],fig:{eq:[SMITH(-6),{t:'bar',at:'hand'}]}});
+variant('splitsquat','lunge',{n:'Przysiad wykroczny',en:'Split squat',p:'knee',kind:'db',inc:1,uni:1,m:{quads:1,glutes:1},
+ cues:['Stopy w wykroku, obie stoją w miejscu','Biodro jedzie prosto w dół','Tylne kolano tuż nad podłogą'],
+ err:['Za krótki krok','Przednia pięta odrywa się'],alt:['bss','lunge']});
+variant('walklunge','lunge',{n:'Wykroki chodzone',en:'Walking lunge',p:'knee',kind:'db',inc:1,uni:1,m:{quads:1,glutes:1},
+ cues:['Długi krok, tułów pionowo','Tylne kolano tuż nad podłogą','Odepchnij się przednią nogą i idź dalej'],
+ err:['Za krótkie kroki','Kolano uderza o podłogę'],alt:['lunge','splitsquat']});
+variant('legext1','legext',{n:'Prostowanie nogi jednonóż',en:'Single-leg extension',p:'iso',kind:'machine',inc:2.5,uni:1,m:{quads:1},
+ cues:['Jedna noga pod wałkiem, kolano w osi maszyny','Pełny wyprost i chwila napięcia','Powolny powrót do pełnego zgięcia'],
+ err:['Biodra odrywają się od siedziska','Skrócony zakres'],alt:['legext','legpress']});
+/* hamstrings and glutes */
+variant('nordic',null,{n:'Nordic (opuszczanie na kolanach)',en:'Nordic hamstring curl',p:'iso',kind:'bw',inc:2.5,m:{hams:1},
+ cues:['Klęk, pięty zablokowane (partner, drążek, sprzęt)','Opadaj powoli do przodu, biodra wyprostowane','Złap się rękami i wróć z pomocą rąk'],
+ err:['Zginanie w biodrach zamiast opadania całym ciałem','Za szybkie opadanie'],alt:['legcurl','lyingcurl'],
+ fig:{ecc:'AB',hl:['thigh'],eq:[{t:'pad',at:'ankle',dy:7}],
+  A:{a:[-42,6],hip:[0,50],t:90,ks:1,ft:180,hand:{sh:[8,-26]},es:-1,h:90},B:{a:[-42,6],hip:[34,34],t:40,ks:1,ft:180,hand:{sh:[22,-24]},es:-1,h:35},
+  sA:['Klęk','Tułów i uda w jednej linii, pięty zablokowane.'],sB:['Opadanie','Opadaj jak najwolniej, biodra cały czas wyprostowane.'],
+  marks:[{t:'line',a:'k1',b:'sh',o:0,n:1,l:'Kolano, biodro i bark w jednej linii'}],bad:[]}});
+variant('hipext',null,{n:'Wyprosty na ławce 45°',en:'45° hip extension',p:'hinge',kind:'bw',inc:2.5,m:{hams:1,glutes:1},
+ cues:['Wałek pod biodrami, nogi proste','Opuszczaj tułów, zginając się w biodrach','Wracaj do linii prostej z nogami, bez przeprostu'],
+ err:['Przeprost w lędźwiach na górze','Zaokrąglanie pleców zamiast ruchu w biodrach'],alt:['rdl','nordic'],
+ fig:{ecc:'AB',hl:['thigh'],eq:[{t:'rail',from:[-4,0],to:[54,56],w:5},{t:'rail',from:[54,56],to:[54,0],w:4},{t:'pad',at:'hip',dx:6,dy:-6},{t:'pad',at:'ankle',dx:5,dy:-5}],
+  A:{a:[0,8],hip:[59,67],t:45,ks:1,ft:-45,hand:{sh:[6,-22]},es:1,h:45},B:{a:[0,8],hip:[59,67],t:-62,ks:1,ft:-45,hand:{sh:[8,-20]},es:1,h:-70},
+  sA:['Góra','Tułów i nogi w jednej linii, ręce na klatce.'],sB:['Dół','Zegnij się w biodrach, plecy proste.'],
+  marks:[{t:'line',a:'an1',b:'sh',o:0,n:1,ph:'A',l:'Na górze ciało w jednej linii, bez przeprostu'}],bad:[]}});
+variant('singlerdl','dbrdl',{n:'Rumuński martwy ciąg jednonóż',en:'Single-leg Romanian deadlift',p:'hinge',kind:'db',inc:1,uni:1,m:{hams:1,glutes:1},
+ cues:['Stań na jednej nodze, kolano lekko ugięte','Biodra w tył, tylna noga unosi się w linii z tułowiem','Plecy proste, biodra równo'],
+ err:['Otwieranie biodra na bok','Zaokrąglone plecy'],alt:['dbrdl','rdl'],
+ fig:{A:{a:[0,4],a2:[-4,6],hip:[0,89],t:90,hand:{sh:[3,-58]},h:90},B:{a:[0,4],a2:[-80,60],ks2:-1,ft2:-90,hip:[-6,80],t:12,hand:{sh:[3,-58]},h:20}}});
+variant('glutebridge',null,{n:'Mostek biodrowy ze sztangą',en:'Barbell glute bridge',p:'hinge',kind:'bar',inc:5,m:{glutes:1,hams:0.5},
+ cues:['Leżysz na plecach, gryf na biodrach na podkładce','Stopy blisko pośladków','Wypchnij biodra w górę, pauza 1 s'],
+ err:['Przeprost w lędźwiach','Stopy za daleko'],alt:['hipthrust','singlebridge'],
+ fig:{ecc:'BA',hl:['thigh'],eq:[{t:'bar',at:'hip',dy:12}],
+  A:{a:[42,4],sh:[-38,8],hip:[2,8],hand:{hip:[-4,9]},ks:1,h:180},B:{a:[42,4],sh:[-38,8],hip:[8,34],hand:{hip:[-4,9]},ks:1,h:180},
+  sA:['Dół','Plecy na podłodze, stopy płasko, gryf na biodrach.'],sB:['Góra','Wypchnij biodra, aż tułów i uda będą w jednej linii.'],
+  marks:[{t:'line',a:'sh',b:'k1',o:0,n:1,ph:'B',l:'Na górze tułów i uda w jednej linii'}],bad:[]}});
+variant('dbthrust','hipthrust',{n:'Hip thrust z hantlem',en:'Dumbbell hip thrust',p:'hinge',kind:'db',inc:2,m:{glutes:1,hams:0.5},
+ cues:['Dolne łopatki o krawędź ławki, hantel na biodrach','Na górze tułów i uda w jednej linii','Pauza 1 s z napiętymi pośladkami'],
+ err:['Przeprost lędźwi','Stopy za daleko'],alt:['hipthrust','glutebridge'],
+ fig:{eq:[{t:'bench',pts:[[-70,36],[-36,36]]},{t:'db',at:'hip',dy:12,r:9}]}});
+variant('singlebridge',null,{n:'Mostek biodrowy jednonóż',en:'Single-leg glute bridge',p:'hinge',kind:'bw',inc:2.5,uni:1,m:{glutes:1,hams:0.5},
+ cues:['Leżysz na plecach, jedna stopa na podłodze, druga noga w górze','Wypchnij biodra do linii prostej','Miednica nie opada na bok'],
+ err:['Przeprost lędźwi','Opadanie miednicy'],alt:['glutebridge','hipthrust'],
+ fig:{ecc:'BA',hl:['thigh'],eq:[],
+  A:{a:[42,4],a2:[76,51],ks2:1,ft2:20,sh:[-38,8],hip:[2,8],hand:{hip:[-14,-4]},ks:1,h:180},B:{a:[42,4],a2:[82,76],ks2:1,ft2:20,sh:[-38,8],hip:[8,34],hand:{hip:[-14,-4]},ks:1,h:180},
+  sA:['Dół','Plecy na podłodze, jedna noga uniesiona.'],sB:['Góra','Biodra w górę, tułów i udo w jednej linii.'],
+  marks:[{t:'line',a:'sh',b:'k1',o:0,n:1,ph:'B',l:'Na górze tułów i udo w jednej linii'}],bad:[]}});
+/* calves */
+variant('lpcalf','legpress',{n:'Wspięcia na suwnicy',en:'Leg press calf raise',p:'iso',kind:'machine',inc:5,m:{calves:1},
+ cues:['Przód stóp na dolnej krawędzi platformy, nogi proste','Opuść pięty jak najniżej, pauza','Wypchnij platformę palcami maksymalnie'],
+ err:['Zginanie kolan','Za mały zakres'],alt:['calf','seatedcalf'],
+ fig:{A:{hip:[0,32],t:140,a:[66,86],ks:1,ft:105,hand:{hip:[12,-2]},h:122},B:{hip:[0,32],t:140,a:[72,92],ks:1,ft:150,hand:{hip:[12,-2]},h:122},
+  sA:['Dół','Nogi proste, pięty opuszczone jak najniżej.'],sB:['Góra','Wypchnij platformę palcami, kolana zostają proste.'],
+  marks:[{t:'dot',j:'an1',n:1,l:'Ruch tylko w kostce, kolana proste'}],bad:[]}});
+variant('dbcalf','calf',{n:'Wspięcia jednonóż z hantlem',en:'Single-leg dumbbell calf raise',p:'iso',kind:'db',inc:2,uni:1,m:{calves:1},
+ cues:['Przód stopy na stopniu, hantel w ręce po stronie nogi','Pięta jak najniżej, pauza 1–2 s','Wspinaczka maksymalnie wysoko'],
+ err:['Za mały zakres','Odbijanie się z dołu'],alt:['calf','seatedcalf']});
+const NEEDS2={inclinebar:['barbell','bench'],smithbench:['machines','bench'],smithincl:['machines','bench'],inclinemach:['machines'],
+ chinup:['pullup'],closepull:['cable'],onearmpull:['cable'],tbar:['barbell'],onearmrow:['cable'],
+ arnold:['dumbbells','bench'],seatedlat:['dumbbells','bench'],smithohp:['machines','bench'],
+ preacher:['dumbbells','bench'],barcurl:['barbell'],ezcurl:['barbell'],conc:['dumbbells','bench'],cablecurl1:['cable'],
+ cgbench:['barbell','bench'],pushdown1:['cable'],ezskull:['barbell','bench'],triext1:['dumbbells'],
+ frontsquat:['barbell'],smithsquat:['machines'],splitsquat:['dumbbells'],walklunge:['dumbbells'],legext1:['machines'],
+ nordic:[],hipext:['machines'],singlerdl:['dumbbells'],glutebridge:['barbell'],dbthrust:['dumbbells','bench'],singlebridge:[],
+ lpcalf:['machines'],dbcalf:['dumbbells']};
+
 /* ---------- Equipment each exercise needs ---------- */
 export const EQUIPMENT=[['barbell','Sztanga ze stojakiem'],['dumbbells','Hantle'],['bench','Ławka'],['machines','Maszyny'],['cable','Wyciąg'],['pullup','Drążek'],['dip','Poręcze']];
 const NEEDS={squat:['barbell'],goblet:['dumbbells'],bss:['dumbbells','bench'],lunge:['dumbbells'],legext:['machines'],deadlift:['barbell'],rdl:['barbell'],
@@ -534,6 +701,7 @@ const NEEDS={squat:['barbell'],goblet:['dumbbells'],bss:['dumbbells','bench'],lu
  legpress:['machines'],hack:['machines'],chestpress:['machines'],pecdeck:['machines'],revpec:['machines'],machpress:['machines'],machinerow:['machines'],lyingcurl:['machines'],seatedcalf:['machines'],
  cablefly:['cable'],cablecurl:['cable'],ropeoh:['cable'],cablelat:['cable'],cablecrunch:['cable'],straightpd:['cable'],
  dbohp:['dumbbells','bench'],hammer:['dumbbells'],inclinecurl:['dumbbells','bench'],dbrdl:['dumbbells'],stepup:['dumbbells','bench'],skull:['dumbbells','bench']};
+Object.assign(NEEDS,NEEDS2);
 for(const id in EX){if(!NEEDS[id])throw new Error('Brak sprzętu dla '+id);EX[id].needs=NEEDS[id];EX[id].id=id;}
 /** Exercise is doable with the given equipment list. */
 export const canDo=(ex,equip)=>ex.needs.every(n=>equip.includes(n));
@@ -564,6 +732,9 @@ export const SOURCES={
  paoli16:['Paoli i in. 2016: ściąganie, wiosłowanie i wyciskanie nad głowę, przyrost włókien najszerszego','https://www.mdpi.com/2072-6643/8/6/331'],
  mann19:['Mannarino i in. 2019: uginanie na modlitewniku i wiosłowanie, przyrost bicepsa','https://pubmed.ncbi.nlm.nih.gov/?term=Mannarino+2019+preacher+curl+dumbbell+row+biceps'],
  maeo23t:['Maeo i in. 2023: triceps nad głową vs prostowanie na wyciągu','https://pubmed.ncbi.nlm.nih.gov/?term=Maeo+2023+triceps+brachii+hypertrophy+overhead'],
+ pinto25:['Pinto i in. 2025: rozpiętki na maszynie, przyrost obu części klatki','https://pubmed.ncbi.nlm.nih.gov/?term=Pinto+2025+pec+deck+one+three+sets+pectoralis+thickness'],
+ kassiano25:['Kassiano i in. 2025: uginanie na modlitewniku i na ławce skośnej, przyrost zginaczy łokcia','https://sci-sport.com/en/effects-of-incline-and-preacher-curls-on-regional-hypertrophy-and-strength-266/'],
+ bourne17:['Bourne i in. 2017: nordic i wyprosty bioder 45°, przyrost dwugłowych','https://bjsm.bmj.com/content/51/5/469'],
  haugen23:['Haugen i in. 2023: wolne ciężary a maszyny dają podobny przyrost (metaanaliza)','https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7'],
 };
 const EVID={
@@ -573,7 +744,15 @@ const EVID={
  bench:['A','ogas13'],dbbench:['B','haugen23'],incline:['A','chaves20'],pushup:['A','kikuchi17'],chestpress:['B','haugen23'],
  ohp:['B','paoli16'],dbohp:['B','paoli16'],machpress:['B','haugen23'],latraise:['A','latr25'],cablelat:['A','latr25'],
  latpull:['B','paoli16'],pullup:['B','paoli16'],cablerow:['B','paoli16'],row:['B','paoli16'],dbrow:['B','mann19'],machinerow:['B','haugen23'],
- curl:['B','mann19'],cablecurl:['B','mann19'],inclinecurl:['B','mann19'],
+ curl:['B','mann19'],cablecurl:['B','mann19'],inclinecurl:['A','kassiano25'],pecdeck:['A','pinto25'],cablefly:['B','pinto25'],
+ inclinebar:['B','chaves20'],smithbench:['B','haugen23'],smithincl:['B','chaves20'],inclinemach:['B','haugen23'],
+ chinup:['B','paoli16'],closepull:['B','paoli16'],onearmpull:['B','paoli16'],tbar:['B','paoli16'],onearmrow:['B','paoli16'],
+ arnold:['B','paoli16'],seatedlat:['B','latr25'],smithohp:['B','haugen23'],
+ preacher:['A','kassiano25'],barcurl:['B','mann19'],ezcurl:['B','mann19'],conc:['B','mann19'],cablecurl1:['B','mann19'],
+ cgbench:['B','ogas13'],pushdown1:['B','maeo23t'],ezskull:['B','maeo23t'],triext1:['B','maeo23t'],
+ frontsquat:['B','kubo19'],smithsquat:['B','haugen23'],splitsquat:['B','fonseca14'],walklunge:['B','fonseca14'],legext1:['B','maeo23q'],
+ nordic:['A','bourne17'],hipext:['A','bourne17'],singlerdl:['B','sldl24'],glutebridge:['B','plotkin23'],dbthrust:['B','plotkin23'],singlebridge:['B','plotkin23'],
+ lpcalf:['B','kino23'],dbcalf:['B','kino23'],
  ropeoh:['A','maeo23t'],pushdown:['A','maeo23t'],triext:['B','maeo23t'],skull:['B','maeo23t'],
 };
 export const EV_NAME={A:'Badanie przyrostu',B:'Zbadany wariant lub program'};
