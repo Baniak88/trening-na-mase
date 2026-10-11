@@ -635,3 +635,14 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .inl.photo img{width:100%;height:100%;object-fit:contain;display:block}
 .sec-h .small{font-weight:400}
 .pill.tog[aria-pressed="true"]{background:var(--ok-soft);color:var(--ok)}
+.sheet-back{align-self:flex-start;border:0;background:none;color:var(--accent);font:500 16px var(--body);padding:2px 0;min-height:32px}
+.altrow{padding-right:12px}
+.altprev{display:flex;align-items:center;gap:12px;flex:1;min-width:0;border:0;background:none;padding:0;text-align:left;color:inherit}
+.tglrow{display:flex;align-items:center;gap:10px;font-size:15px;padding:10px 12px;background:var(--sunk);border-radius:12px}
+.tglrow input{width:20px;height:20px;accent-color:var(--accent)}
+.pe-edit.big{padding:0;gap:10px}
+.pe-edit.big .pe-stp .ctl button{height:48px}
+.pe-edit.big .pe-stp .ctl{background:var(--sunk)}
+.sheet .list{background:var(--sunk)}
+.sheet .list .thumb{background:var(--surface)}
+.toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 70px)}

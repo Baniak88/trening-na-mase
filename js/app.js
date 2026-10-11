@@ -42,7 +42,7 @@ const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].fig ? figSVG(id, 
 /* ---------- State ---------- */
 const S = load();
 if (!S.settings.cycleStart) S.settings.cycleStart = weekStart().toISOString();
-const UI = {tab: 'train', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
+const UI = {stack: [], permSwap: false, tab: 'train', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
   aq: '', am: 'all', ak: 'all', all: false, mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
 let saveT = null;
 function persistNow() { clearTimeout(saveT); save(S); }
@@ -236,11 +236,13 @@ function loop(ts) {
 function kick() { if (!AN.raf) AN.raf = requestAnimationFrame(loop); }
 
 /* ---------- Sheets ---------- */
-function openSheet(id, ctx) { UI.sheet = {id, ctx: ctx || null, tab: 'ruch', view: UI.lastView || 'fig'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
-function openPanel(type, extra) { UI.sheet = {type, ...(extra || {})}; renderSheet(true); }
-function closeSheet() { UI.sheet = null; $('#sheetRoot').innerHTML = ''; document.body.classList.remove('lock'); kick(); }
+/* Sheets stack: opening a sheet over another keeps the one below; back returns to it. */
+function openSheet(id, ctx) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {id, ctx: ctx || null, tab: ctx && ctx.from === 'plan' ? 'set' : 'ruch', view: UI.lastView || 'fig'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
+function openPanel(type, extra) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {type, ...(extra || {})}; renderSheet(true); }
+function closeSheet() { const prev = UI.stack.pop(); if (prev) { UI.sheet = prev; renderSheet(true); return; } UI.sheet = null; $('#sheetRoot').innerHTML = ''; document.body.classList.remove('lock'); kick(); }
+function closeAll() { UI.stack = []; closeSheet(); }
 function sheetFrame(title, eyebrow, sub, tabs, body) {
-  return '<div class="sheet-bg" data-act="sheet-close"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT" data-stop="1"><div class="sheet-top"><div class="grab"></div><div class="sheet-h"><div style="min-width:0">' + (eyebrow ? '<div class="eyebrow">' + eyebrow + '</div>' : '') + '<h2 id="shT">' + title + '</h2>' + (sub ? '<div class="muted small">' + sub + '</div>' : '') + '</div><button class="x" data-act="sheet-close" aria-label="Zamknij">×</button></div>' + (tabs || '') + '</div><div class="sheet-body">' + body + '</div></div></div>';
+  return '<div class="sheet-bg" data-act="sheet-close"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT" data-stop="1"><div class="sheet-top"><div class="grab"></div>' + (UI.stack.length ? '<button class="sheet-back" data-act="sheet-back">‹ Wróć</button>' : '') + '<div class="sheet-h"><div style="min-width:0">' + (eyebrow ? '<div class="eyebrow">' + eyebrow + '</div>' : '') + '<h2 id="shT">' + title + '</h2>' + (sub ? '<div class="muted small">' + sub + '</div>' : '') + '</div><button class="x" data-act="sheet-close" aria-label="Zamknij">×</button></div>' + (tabs || '') + '</div><div class="sheet-body">' + body + '</div></div></div>';
 }
 function renderSheet(fresh) {
   const sh = UI.sheet; if (!sh) { closeSheet(); return; }
@@ -256,6 +258,7 @@ function ctxUsed(ctx) {
   if (!ctx) return [];
   if (ctx.from === 'session' && S.draft) return S.draft.ex.map(q => q.id);
   if (ctx.from === 'today' && S.today) return S.today.items.map(q => q.id);
+  if (ctx.from === 'plan' && curPlan() && curPlan().days[ctx.d]) return curPlan().days[ctx.d].ex.map(q => q.id);
   return [];
 }
 function exSheet() {
@@ -263,7 +266,7 @@ function exSheet() {
   const ctx = sh.ctx; const q = ctx && ctx.from === 'session' && S.draft ? S.draft.ex[ctx.i] : null;
   const alts = alternatives(sh.id, ctx ? equip() : EQUIPMENT.map(e => e[0]), ctxUsed(ctx)).filter(a => !S.settings.exclude.includes(a));
   const pat = (PATTERNS.find(p => p[0] === ex.p) || ['', ''])[1];
-  const tabs = '<div class="stabs" role="tablist">' + [['ruch', 'Ruch'], ['info', 'Wskazówki']].concat(alts.length ? [['alt', ctx ? 'Zamień' : 'Zamienniki']] : []).map(([k, l]) => '<button role="tab" data-act="stab" data-t="' + k + '" aria-selected="' + (sh.tab === k) + '">' + l + '</button>').join('') + '</div>';
+  const tabs = '<div class="stabs" role="tablist">' + (ctx && ctx.from === 'plan' ? [['set', 'Ustaw']] : []).concat([['ruch', 'Ruch'], ['info', 'Opis']]).concat(alts.length || ctx ? [['alt', ctx ? 'Zamień' : 'Zamienniki']] : []).map(([k, l]) => '<button role="tab" data-act="stab" data-t="' + k + '" aria-selected="' + (sh.tab === k) + '">' + l + '</button>').join('') + '</div>';
   let h = '';
   if (sh.tab === 'ruch' && ex.photo && ex.fig) h += '<div class="seg viewseg" role="group" aria-label="Widok"><button data-act="view" data-v="fig" aria-pressed="' + (sh.view !== 'photo') + '">Rysunek z liniami</button><button data-act="view" data-v="photo" aria-pressed="' + (sh.view === 'photo') + '">Zdjęcia</button></div>';
   if (sh.tab === 'ruch' && sh.view === 'photo' && (ex.photo || ex.lib)) {
@@ -294,14 +297,22 @@ function exSheet() {
     if (best) h += '<p class="small">Twój rekord: <b class="mono">' + kgTxt(ex, best) + '</b></p>';
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Jak wykonać</div>' + (ex.lib ? '<p class="muted small">Opis z bazy free-exercise-db, po angielsku.</p>' : '') + '<ul class="cues">' + ex.cues.map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
     if (ex.err.length) h += '<div class="stack" style="gap:8px"><div class="sec-t">Częste błędy</div><ul class="cues bad">' + ex.err.map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
-  } else {
-    if (ctx) {
-      const locked = q && q.sets.some(s => s.done);
-      if (locked) h += '<p class="muted small">Masz już odhaczone serie tego ćwiczenia, więc zamiana jest zablokowana.</p>';
-      h += alts.map(a => '<div class="card altc"><button class="thumb" data-act="sheet-open" data-id="' + a + '" aria-label="Technika: ' + EX[a].n + '">' + thumb(a) + '</button><div style="min-width:0"><b>' + EX[a].n + '</b><div class="muted small">' + KINDN[EX[a].kind] + ' · ' + primary(EX[a]).map(m => MUSCLES[m]).join(', ') + '</div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="swap" data-id="' + a + '"' + (locked ? ' disabled' : '') + '>Zamień</button>' + (S.settings.mode === 'plan' ? '<button class="btn sm ghost" data-act="swap" data-id="' + a + '" data-perm="1"' + (locked ? ' disabled' : '') + '>Na stałe w planie</button>' : '') + '</div></div></div>').join('');
-    } else {
-      h += alts.map(a => '<button class="card altc" data-act="sheet-open" data-id="' + a + '"><span class="thumb">' + thumb(a) + '</span><span style="min-width:0;text-align:left"><b style="display:block">' + EX[a].n + '</b><span class="muted small">' + KINDN[EX[a].kind] + ' · technika ›</span></span></button>').join('');
+  } else if (sh.tab === 'set') {
+    const day = (curPlan() || {days: []}).days[ctx.d]; const e = day && day.ex[ctx.i];
+    if (!e) h += '<p class="muted">Tego ćwiczenia nie ma już w planie.</p>';
+    else {
+      h += '<div class="pe-edit big">' + peStepper('Serie', 'sets', e.sets, ctx.d, ctx.i) + peStepper(isS(ex) ? 'Od, s' : 'Powtórzenia od', 'lo', e.lo, ctx.d, ctx.i) + peStepper(isS(ex) ? 'Do, s' : 'Powtórzenia do', 'hi', e.hi, ctx.d, ctx.i) + peStepper('Przerwa', 'rest', e.rest, ctx.d, ctx.i, true) + '</div>';
+      h += '<div class="seg" style="grid-template-columns:1fr 1fr"><button data-act="pe-move" data-d="' + ctx.d + '" data-i="' + ctx.i + '" data-dir="-1"' + (ctx.i === 0 ? ' disabled' : '') + '>↑ Wcześniej</button><button data-act="pe-move" data-d="' + ctx.d + '" data-i="' + ctx.i + '" data-dir="1"' + (ctx.i === day.ex.length - 1 ? ' disabled' : '') + '>↓ Później</button></div>';
+      h += '<button class="btn primary big" data-act="sheet-back">Gotowe</button><button class="btn ghost wide" data-act="stab" data-t="alt">Zamień na inne ćwiczenie</button><button class="btn danger wide" data-act="pe-ex-del" data-d="' + ctx.d + '" data-i="' + ctx.i + '">Usuń z planu</button>';
     }
+  } else {
+    const locked = q && q.sets.some(s2 => s2.done);
+    if (locked) h += '<p class="notice small">Masz już odhaczone serie tego ćwiczenia, więc zamiana jest zablokowana.</p>';
+    if (ctx) h += '<p class="muted small">Dotknij „Wybierz”, żeby zamienić. Dotknij nazwy, żeby zobaczyć technikę.</p>';
+    if (ctx && ctx.from !== 'plan' && S.settings.mode === 'plan') h += '<label class="tglrow"><input type="checkbox" id="permSwap"' + (UI.permSwap ? ' checked' : '') + '> Zamień też w planie na stałe</label>';
+    h += '<ul class="list">' + alts.map(a2 => { const e2 = EX[a2]; return '<li><div class="lrow altrow"><button class="altprev" data-act="sheet-open" data-id="' + a2 + '"><span class="thumb">' + thumb(a2) + '</span><span class="lmain"><b>' + e2.n + '</b><span>' + KINDN[e2.kind] + ' · ' + primary(e2).map(m => MUSCLES[m]).join(', ') + '</span></span></button>' +
+      (ctx ? '<button class="btn sm primary" data-act="swap" data-id="' + a2 + '"' + (locked ? ' disabled' : '') + '>Wybierz</button>' : '<span class="evb ' + e2.ev.l + '">' + e2.ev.l + '</span>') + '</div></li>'; }).join('') + '</ul>';
+    if (ctx && !locked) h += '<button class="btn wide" data-act="pick-replace">Wybierz z pełnej listy ćwiczeń</button>';
   }
   if (ctx && ctx.from === 'today') h += '<div class="sheet-actions"><button class="btn ghost wide" data-act="today-remove">Usuń z dzisiejszego treningu</button><button class="btn ghost wide" data-act="exclude">Nie proponuj tego ćwiczenia</button></div>';
   else if (!ctx && S.settings.exclude.includes(sh.id)) h += '<div class="sheet-actions"><button class="btn wide" data-act="unexclude">Znowu proponuj to ćwiczenie</button></div>';
@@ -324,8 +335,10 @@ function finishSheet() {
 }
 function pickSheet() {
   const sh = UI.sheet; const q = (sh.q || '').trim().toLowerCase();
-  const forPlan = sh.target === 'plan';
-  const used = new Set(forPlan ? ((curPlan() || {days: []}).days[sh.d] || {ex: []}).ex.map(e => e.id) : sh.target === 'session' ? (S.draft ? S.draft.ex.map(e => e.id) : []) : (S.today ? S.today.items.map(e => e.id) : []));
+  const replace = sh.target === 'replace';
+  if (replace) sh.d = sh.ctx.d;
+  const forPlan = sh.target === 'plan' || (replace && sh.ctx.from === 'plan');
+  const used = new Set(replace ? ctxUsed(sh.ctx) : forPlan ? ((curPlan() || {days: []}).days[sh.d] || {ex: []}).ex.map(e => e.id) : sh.target === 'session' ? (S.draft ? S.draft.ex.map(e => e.id) : []) : (S.today ? S.today.items.map(e => e.id) : []));
   const list = Object.values(EX).filter(ex => listable(ex, sh.all) && (forPlan || canDo(ex, equip())) && !used.has(ex.id) && (!q || (ex.n + ' ' + ex.en + ' ' + Object.keys(ex.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
   // Adding to a weekly plan day: exercises for that day's muscles come first.
   const dm = forPlan ? (((curPlan() || {days: []}).days[sh.d] || {}).mus || []) : [];
@@ -335,7 +348,7 @@ function pickSheet() {
     '<input class="search" id="pickQ" type="search" placeholder="Szukaj: nazwa lub partia" value="' + esc(sh.q || '') + '" aria-label="Szukaj ćwiczenia"><ul class="exlist">' +
     list.map(ex => '<li><button class="exrow" data-act="pick-add" data-id="' + ex.id + '"><span class="thumb">' + thumb(ex.id) + '</span><span style="min-width:0"><span class="nm" style="display:block">' + ex.n + '</span><span class="hn" style="display:block">' + KINDN[ex.kind] + ' · ' + primary(ex).map(m => MUSCLES[m]).join(', ') + '</span></span><span class="tg">+</span></button></li>').join('') + '</ul>' +
     (list.length ? '' : '<p class="muted">Nic nie pasuje. Sprawdź sprzęt w profilu „' + esc(profile().name) + '”.</p>');
-  return sheetFrame('Dodaj ćwiczenie', forPlan ? 'Wszystkie ćwiczenia' : 'Sprzęt: ' + esc(profile().name), forPlan ? 'Ćwiczenia, których nie zrobisz w danej siłowni, zamienią się automatycznie.' : '', '', body);
+  return sheetFrame(replace ? 'Zamień na…' : 'Dodaj ćwiczenie', forPlan ? 'Wszystkie ćwiczenia' : 'Sprzęt: ' + esc(profile().name), forPlan ? 'Ćwiczenia, których nie zrobisz w danej siłowni, zamienią się automatycznie.' : '', '', body);
 }
 function muscleSheet() {
   const m = UI.sheet.m; const rec = recovery(S.workouts); const r = rec[m]; const wk = weeklySets(S.workouts)[m]; const t = MUSCLE_INFO[m].target;
@@ -350,7 +363,9 @@ const hoursTxt = h => h + ' h';
 
 $('#sheetRoot').addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]'); if (!b) return; const a = b.dataset.act;
-  if (a === 'sheet-close') { if (b.classList.contains('sheet-bg') && ev.target.closest('[data-stop]')) return; closeSheet(); return; }
+  if (a === 'sheet-close') { if (b.classList.contains('sheet-bg') && ev.target.closest('[data-stop]')) return; closeAll(); return; }
+  if (a === 'sheet-back') { closeSheet(); return; }
+  if (a === 'plan-ex') { const e = curPlan().days[+b.dataset.d].ex[+b.dataset.i]; openSheet(e.id, {from: 'plan', d: +b.dataset.d, i: +b.dataset.i}); return; }
   if (a === 'stab') { UI.sheet.tab = b.dataset.t; renderSheet(true); return; }
   if (a === 'view') { UI.sheet.view = UI.lastView = b.dataset.v; renderSheet(false); return; }
   if (a === 'photo-k') { const p = $('#photos'); if (!p) return; p.classList.remove('show0', 'show1', 'still'); if (b.dataset.k !== '2') p.classList.add('still', 'show' + b.dataset.k); document.querySelectorAll('.steps button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); return; }
@@ -359,28 +374,37 @@ $('#sheetRoot').addEventListener('click', ev => {
   if (a === 'mode') { AN.mode = +b.dataset.m; renderSheet(false); return; }
   if (a === 'step-k') { AN.paused = true; AN.k = +b.dataset.k; const tg = $('[data-act=anim-toggle]'); if (tg) tg.textContent = '▶ Odtwórz'; drawFig(b.textContent.slice(1)); return; }
   if (a === 'sheet-open') { openSheet(b.dataset.id); return; }
-  if (a === 'go-ex') { closeSheet(); goEx(+b.dataset.i); return; }
-  if (a === 'finish-yes') { closeSheet(); finish(); return; }
+  if (a === 'go-ex') { closeAll(); goEx(+b.dataset.i); return; }
+  if (a === 'finish-yes') { closeAll(); finish(); return; }
   if (a === 'discard-ask') { openPanel('finish', {mode: 'discard'}); return; }
-  if (a === 'discard-yes') { closeSheet(); discard(); return; }
+  if (a === 'discard-yes') { closeAll(); discard(); return; }
+  if (a === 'pick-replace') { openPanel('pick', {target: 'replace', ctx: UI.sheet.ctx, q: ''}); return; }
   if (a === 'pick-all') { UI.sheet.all = b.dataset.v === '1'; renderSheet(false); return; }
   if (a === 'day-go') { UI.sheet.wd = +b.dataset.v; UI.peOpen = null; renderSheet(false); return; }
   if (a === 'pick-open') { openPanel('pick', {target: b.dataset.target, d: +b.dataset.d, q: '', wd: UI.sheet.type === 'day' ? UI.sheet.wd : null}); return; }
-  if (a === 'pick-add') { const sh = UI.sheet; closeSheet(); addExercise(sh.target, b.dataset.id, sh.d); if (sh.wd != null) openPanel('day', {wd: sh.wd}); return; }
-  if (a.startsWith('pe-') || a === 'set-pick') { if (a === 'set-pick') closeSheet(); onAct(ev); return; }
-  if (a === 'today-remove') { const i = UI.sheet.ctx.idx; S.today.items.splice(i, 1); persistSoon(); closeSheet(); render(); toast('Usunięte z dzisiejszego treningu'); return; }
-  if (a === 'exclude') { const id = UI.sheet.id; if (!S.settings.exclude.includes(id)) S.settings.exclude.push(id); S.today = null; persistNow(); closeSheet(); render(); toast('Nie będę proponować: ' + EX[id].n); return; }
+  if (a === 'pick-add' && UI.sheet.target === 'replace') { const sh = UI.sheet; closeSheet(); swapExercise(sh.ctx, b.dataset.id); return; }
+  if (a === 'pick-add') { const sh = UI.sheet; closeSheet(); addExercise(sh.target, b.dataset.id, sh.d); return; }
+  if (a.startsWith('pe-') || a === 'set-pick') { if (a === 'set-pick') closeAll(); const fromEx = UI.sheet && UI.sheet.ctx && UI.sheet.ctx.from === 'plan'; onAct(ev); if (a === 'pe-ex-del' && fromEx) { closeSheet(); toast('Usunięte z planu'); } return; }
+  if (a === 'today-remove') { const i = UI.sheet.ctx.idx; S.today.items.splice(i, 1); persistSoon(); closeAll(); render(); toast('Usunięte z dzisiejszego treningu'); return; }
+  if (a === 'exclude') { const id = UI.sheet.id; if (!S.settings.exclude.includes(id)) S.settings.exclude.push(id); S.today = null; persistNow(); closeAll(); render(); toast('Nie będę proponować: ' + EX[id].n); return; }
   if (a === 'unexclude') { S.settings.exclude = S.settings.exclude.filter(x => x !== UI.sheet.id); S.today = null; persistNow(); renderSheet(false); toast('Znowu w propozycjach'); return; }
-  if (a === 'swap') { swapExercise(UI.sheet.ctx, b.dataset.id, b.dataset.perm === '1'); return; }
+  if (a === 'swap') { swapExercise(UI.sheet.ctx, b.dataset.id); return; }
 });
 $('#sheetRoot').addEventListener('input', ev => {
   if (ev.target.id === 'figK') { AN.paused = true; AN.k = ev.target.value / 1000; const tg = $('[data-act=anim-toggle]'); if (tg) tg.textContent = '▶ Odtwórz'; drawFig('Przewijanie klatka po klatce'); }
+  if (ev.target.id === 'permSwap') { UI.permSwap = ev.target.checked; return; }
   if (ev.target.id === 'figMarks') { AN.marks = ev.target.checked; drawFig(); }
   if (ev.target.id === 'pickQ') { UI.sheet.q = ev.target.value; const pos = ev.target.selectionStart; renderSheet(false); const n = $('#pickQ'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (err) { /* ignore */ } }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && UI.sheet) closeSheet(); });
 
 function swapExercise(ctx, nid, perm) {
+  if (perm == null) perm = !!UI.permSwap;
+  if (ctx.from === 'plan') {
+    const day = curPlan().days[ctx.d]; const e = day.ex[ctx.i]; const rx = prescribe(EX[nid], {main: ctx.i === 0});
+    day.ex[ctx.i] = {id: nid, sets: e.sets, lo: rx.lo, hi: rx.hi, rest: rx.rest};
+    S.today = null; persistNow(); closeSheet(); render(); toast('Zamienione na: ' + EX[nid].n); return;
+  }
   if (ctx.from === 'session') {
     const i = ctx.i; const q = S.draft.ex[i];
     if (perm) { const o = q.orig || q.id; S.settings.subs[o] = nid; if (nid === o) delete S.settings.subs[o]; }
@@ -391,7 +415,7 @@ function swapExercise(ctx, nid, perm) {
     if (perm) { const o = it.orig || it.id; S.settings.subs[o] = nid; if (nid === o) delete S.settings.subs[o]; S.today = null; }
     else { const rx = prescribe(EX[nid], {main: ctx.idx === 0}); S.today.items[ctx.idx] = {...it, id: nid, lo: rx.lo, hi: rx.hi, rest: rx.rest, why: it.why}; }
   }
-  persistNow(); closeSheet(); render(); toast('Zamienione: ' + EX[nid].n);
+  persistNow(); closeAll(); render(); toast('Zamienione na: ' + EX[nid].n);
 }
 function addExercise(target, id, day) {
   const rx = prescribe(EX[id], {});
@@ -409,7 +433,7 @@ function addExercise(target, id, day) {
 /* ---------- Plan editor helpers ---------- */
 const curPlan = () => S.customPlans.find(c => c.id === UI.pe);
 function openPlanEditor(id) { UI.pe = id; UI.peOpen = null; UI.peDel = null; UI.sub = 'planedit'; render(); window.scrollTo(0, 0); }
-function planChanged() { S.today = null; persistNow(); render(); if (UI.sheet && UI.sheet.type === 'day') renderSheet(false); }
+function planChanged() { S.today = null; persistNow(); render(); if (UI.sheet) renderSheet(false); }
 function subBack() { UI.peWd = null; UI.sub = UI.sub === 'planedit' ? 'settings' : UI.sub === 'know' && UI.fromSettings ? 'settings' : null; UI.peDel = null; render(); window.scrollTo(0, 0); }
 function planLoad(days) { const v = {}; days.forEach(d => d.ex.forEach(e => { const m = (EX[e.id] || {}).m || {}; for (const k in m) v[k] = (v[k] || 0) + m[k] * e.sets; })); return v; }
 
@@ -457,7 +481,7 @@ function daySheet() {
   let h = '<div class="wdpick" role="tablist" aria-label="Dzień tygodnia">' + WD_SHORT.map((l, w) => '<button role="tab" data-act="day-go" data-v="' + w + '" aria-selected="' + (w === wd) + '"' + (has(w) ? ' class="has"' : '') + '>' + l + '</button>').join('') + '</div>';
   h += '<div class="eyebrow">Partie mięśni</div><div class="mgrid" role="group" aria-label="Partie mięśni">' + TRAINABLE.map(m => '<button class="mtog" data-act="pe-mus" data-wd="' + wd + '" data-m="' + m + '" aria-pressed="' + !!(d && d.mus.includes(m)) + '">' + MUSCLES[m] + '</button>').join('') + '</div>';
   if (d) {
-    h += '<div class="eyebrow">Ćwiczenia · dotknij, żeby zmienić serie i powtórzenia</div>' + peExList(d, di) +
+    h += '<div class="eyebrow">Ćwiczenia · dotknij, żeby zmienić lub zamienić</div><ul class="list">' + d.ex.map((e, i) => '<li><button class="lrow" data-act="plan-ex" data-d="' + di + '" data-i="' + i + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + EX[e.id].n + '</b><span>' + e.sets + ' × ' + range(EX[e.id], e) + ' · przerwa ' + mmss(e.rest) + '</span></span><span class="chev" aria-hidden="true">›</span></button></li>').join('') + '</ul>' +
       '<div class="row"><button class="btn sm" data-act="pick-open" data-target="plan" data-d="' + di + '">+ Dodaj ćwiczenie</button><button class="btn sm ghost" data-act="pe-refill" data-d="' + di + '">↻ Dobierz inne</button></div>' +
       '<button class="btn primary big" data-act="sheet-close">Gotowe</button>' +
       (wd !== weekdayOf() && d.ex.length ? '<button class="btn ghost wide" data-act="set-pick" data-v="' + di + '">Zrób ten trening dziś</button>' : '');
@@ -805,7 +829,7 @@ function onAct(ev) {
     case 'plan-copy': { const src = allPlans()[v]; const c = {id: 'c' + Date.now().toString(36), name: (src.name + ' (moja wersja)').slice(0, 30), days: clone(src.days).map(d => ({name: d.name, ex: d.ex.map(e => ({id: e.id, sets: e.sets, lo: e.lo, hi: e.hi, rest: e.rest}))}))}; S.customPlans.push(c); persistNow(); openPlanEditor(c.id); toast('Skopiowano, możesz edytować'); break; }
     case 'plan-edit': openPlanEditor(v); break;
     case 'pe-open': { const k = b.dataset.d + '-' + i; UI.peOpen = UI.peOpen === k ? null : k; render(); break; }
-    case 'pe-move': { const day = curPlan().days[+b.dataset.d]; const j = i + +b.dataset.dir; if (j < 0 || j >= day.ex.length) break; [day.ex[i], day.ex[j]] = [day.ex[j], day.ex[i]]; if (UI.peOpen === b.dataset.d + '-' + i) UI.peOpen = b.dataset.d + '-' + j; planChanged(); break; }
+    case 'pe-move': { const day = curPlan().days[+b.dataset.d]; const j = i + +b.dataset.dir; if (j < 0 || j >= day.ex.length) break; if (UI.sheet && UI.sheet.ctx && UI.sheet.ctx.from === 'plan') UI.sheet.ctx.i = j; [day.ex[i], day.ex[j]] = [day.ex[j], day.ex[i]]; if (UI.peOpen === b.dataset.d + '-' + i) UI.peOpen = b.dataset.d + '-' + j; planChanged(); break; }
     case 'pe-step': { const e = curPlan().days[+b.dataset.d].ex[i]; const ex = EX[e.id]; const dir = +b.dataset.dir; const f = b.dataset.f;
       if (f === 'sets') e.sets = Math.min(10, Math.max(1, e.sets + dir));
       if (f === 'rest') e.rest = Math.min(600, Math.max(15, e.rest + dir * 15));
