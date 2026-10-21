@@ -200,3 +200,12 @@ test('muscle length: stretch, shortened and full-range exercises are told apart'
   assert.equal(lenOf(EX.x_crunches), 'short', 'library by name');
   for (const e of Object.values(EX)) assert.ok(['long', 'short', 'full'].includes(lenOf(e)), e.id);
 });
+
+test('every exercise marked with an illustration has both frames on disk', async () => {
+  const {existsSync} = await import('node:fs');
+  const {illSrc} = await import('../js/data/catalog.js');
+  const ids = Object.keys(EX).filter(id => EX[id].ek);
+  assert.ok(ids.length >= 100);
+  for (const id of ids) for (const i of [0, 1]) assert.ok(existsSync(new URL('../' + illSrc(EX[id], i), import.meta.url)), id + '-' + i);
+  assert.equal(illSrc(EX.ohp, 0), null);
+});

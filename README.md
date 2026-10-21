@@ -20,6 +20,7 @@ Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na ka�
 - **Mapa regeneracji.** Sylwetka z przodu i z tyłu pokazuje kolorami, które mięśnie są gotowe, a które jeszcze odpoczywają, i za ile godzin wrócą do formy.
 - **Siłownie ze sprzętem.** Np. „Siłownia” i „Dom”. Generator proponuje tylko ćwiczenia, które zrobisz w danym miejscu.
 - **Ćwiczenia z animacją techniki:** linie kontrolne, fazy ruchu, typowe błędy pokazane na animacji, wskazówki i zamienniki.
+- **Ilustracje ćwiczeń:** czyste rysunki pozycji rozciągnięcia i spięcia (animowane na zmianę) dla 143 ćwiczeń, z mapą pracujących mięśni. Źródło: [Everkinetic](https://github.com/everkinetic/data), licencja CC BY-SA 4.0 (pliki przycięte, szczegóły w `img/ek/LICENSE.md`).
 - **Zdjęcia ćwiczeń:** prawdziwe zdjęcia pozycji startowej i końcowej dla każdego ćwiczenia, z [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (domena publiczna).
 - **Trening krok po kroku:** jedno ćwiczenie na ekranie, duże przyciski do ciężaru i powtórzeń, timer przerwy z dźwiękiem, serie rozgrzewkowe, kalkulator talerzy.
 - **Progresja:** podwójna progresja (najpierw powtórzenia, potem ciężar), rekordy, szacowany 1RM, wykresy postępów.

@@ -1,5 +1,5 @@
 /* Twój Trener: UI. Only exercises with evidence of muscle growth are offered (catalog usable()). Screens: Trening (today / session), Regeneracja, Ćwiczenia, Postępy, Ustawienia, Wiedza. */
-import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, PLANS, CYCLE, KINDN, EQUIPMENT, KINDS, PHOTO_CREDIT, SOURCES, EV_NAME, TRAINABLE, canDo, primary, usable, listable, photoSrc} from './data/catalog.js';
+import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, PLANS, CYCLE, KINDN, EQUIPMENT, KINDS, PHOTO_CREDIT, SOURCES, EV_NAME, TRAINABLE, canDo, primary, usable, listable, photoSrc, illSrc, ILL_CREDIT} from './data/catalog.js';
 import {FC, figSVG, figBounds, visMark} from './figure.js';
 import {recovery, weeklySets, status} from './engine/recovery.js';
 import {generate, alternatives, prescribe, FOCUS, exSeconds} from './engine/generator.js';
@@ -39,7 +39,7 @@ const boxes = {}, bigBoxes = {}, tightBoxes = {};
 const bigBox = id => bigBoxes[id] || (bigBoxes[id] = figBounds(EX[id], 'auto'));
 const tightBox = id => tightBoxes[id] || (tightBoxes[id] = figBounds(EX[id], 'auto', true));
 const thumbCache = {};
-const thumb = id => thumbCache[id] || (thumbCache[id] = (EX[id].photo || EX[id].lib) ? '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
+const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].ek ? '<img class="ill" src="' + illSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : (EX[id].photo || EX[id].lib) ? '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
 
 /** "Triceps: głowa długa" for the first primary muscle that has heads. */
 function headLine(ex) {
@@ -248,7 +248,7 @@ function kick() { if (!AN.raf) AN.raf = requestAnimationFrame(loop); }
 
 /* ---------- Sheets ---------- */
 /* Sheets stack: opening a sheet over another keeps the one below; back returns to it. */
-function openSheet(id, ctx) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {id, ctx: ctx || null, tab: ctx && ctx.from === 'plan' ? 'set' : 'ruch', view: UI.lastView || 'photo'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
+function openSheet(id, ctx) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {id, ctx: ctx || null, tab: ctx && ctx.from === 'plan' ? 'set' : 'ruch', view: UI.lastView || 'ill'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
 function openPanel(type, extra) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {type, ...(extra || {})}; renderSheet(true); }
 function closeSheet() { const prev = UI.stack.pop(); if (prev) { UI.sheet = prev; renderSheet(true); return; } UI.sheet = null; $('#sheetRoot').innerHTML = ''; document.body.classList.remove('lock'); kick(); }
 function closeAll() { UI.stack = []; closeSheet(); }
@@ -273,14 +273,22 @@ function ctxUsed(ctx) {
   return [];
 }
 function exSheet() {
-  const sh = UI.sheet; const ex = EX[sh.id]; const f = ex.fig || {}; const tl = timeline(ex.fig); if (!ex.fig) sh.view = 'photo'; const bad = f.bad || []; const bd = AN.mode >= 0 ? bad[AN.mode] : null;
+  const sh = UI.sheet; const ex = EX[sh.id]; const f = ex.fig || {}; const tl = timeline(ex.fig); const views = [['ill', 'Ilustracja', ex.ek], ['photo', 'Zdjęcia', ex.photo || ex.lib], ['fig', 'Rysunek z liniami', ex.fig]].filter(v => v[2]); if (!views.some(v => v[0] === sh.view)) sh.view = views[0][0]; const bad = f.bad || []; const bd = AN.mode >= 0 ? bad[AN.mode] : null;
   const ctx = sh.ctx; const q = ctx && ctx.from === 'session' && S.draft ? S.draft.ex[ctx.i] : null;
   const alts = alternatives(sh.id, ctx ? equip() : EQUIPMENT.map(e => e[0]), ctxUsed(ctx)).filter(a => !S.settings.exclude.includes(a));
   const pat = (PATTERNS.find(p => p[0] === ex.p) || ['', ''])[1];
   const tabs = '<div class="stabs" role="tablist">' + (ctx && ctx.from === 'plan' ? [['set', 'Ustaw']] : []).concat([['ruch', 'Technika'], ['info', 'Opis']]).concat(alts.length || ctx ? [['alt', ctx ? 'Zamień' : 'Zamienniki']] : []).map(([k, l]) => '<button role="tab" data-act="stab" data-t="' + k + '" aria-selected="' + (sh.tab === k) + '">' + l + '</button>').join('') + '</div>';
   let h = '';
-  if (sh.tab === 'ruch' && ex.photo && ex.fig) h += '<div class="seg viewseg" role="group" aria-label="Widok"><button data-act="view" data-v="photo" aria-pressed="' + (sh.view === 'photo') + '">Zdjęcia</button><button data-act="view" data-v="fig" aria-pressed="' + (sh.view !== 'photo') + '">Rysunek z liniami</button></div>';
-  if (sh.tab === 'ruch' && sh.view === 'photo' && (ex.photo || ex.lib)) {
+  if (sh.tab === 'ruch' && views.length > 1) h += '<div class="seg viewseg n' + views.length + '" role="group" aria-label="Widok">' + views.map(v => '<button data-act="view" data-v="' + v[0] + '" aria-pressed="' + (sh.view === v[0]) + '">' + v[1] + '</button>').join('') + '</div>';
+  if (sh.tab === 'ruch' && sh.view === 'ill') {
+    h += '<div class="photos ill' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + illSrc(ex, 0) + '" alt="' + esc(ex.n) + ': rozciągnięcie" class="ph0"><img src="' + illSrc(ex, 1) + '" alt="' + esc(ex.n) + ': spięcie" class="ph1"><span class="phtag ph0">1 · Rozciągnięcie</span><span class="phtag ph1">2 · Spięcie</span></div>';
+    h += '<div class="frames steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><img src="' + illSrc(ex, 0) + '" alt=""><span><i>1</i>Rozciągnięcie</span></button><button data-act="photo-k" data-k="2" aria-pressed="true"><span class="auto" aria-hidden="true">↻</span><span>Na zmianę</span></button><button data-act="photo-k" data-k="1"><img src="' + illSrc(ex, 1) + '" alt=""><span><i>2</i>Spięcie</span></button></div>';
+    const load = {}; for (const k in ex.m) load[k] = ex.m[k] >= 1 ? 1 : 0.3;
+    h += '<div class="ill-mus"><div class="ill-map">' + targetMap(load) + '</div><div class="ill-ml"><div class="sec-t">Pracujące mięśnie</div><div class="row">' + primary(ex).map(k => '<span class="chip m prim"><i class="dot1"></i>' + MUSCLES[k] + '</span>').join('') + Object.keys(ex.m).filter(k => ex.m[k] < 1).map(k => '<span class="chip m"><i class="dot2"></i>' + MUSCLES[k] + '</span>').join('') + '</div></div></div>';
+    if (f.sA) h += '<p class="steptxt"><b>' + f.sA[0] + ':</b> ' + f.sA[1] + '</p>';
+    if (f.sB) h += '<p class="steptxt"><b>' + f.sB[0] + ':</b> ' + f.sB[1] + '</p>';
+    h += '<p class="muted small">Ilustracje: <a href="' + ILL_CREDIT[1] + '" target="_blank" rel="noopener">' + ILL_CREDIT[0] + '</a>, licencja <a href="' + ILL_CREDIT[3] + '" target="_blank" rel="noopener">' + ILL_CREDIT[2] + '</a> (przycięte i przebarwione). Sprzęt na rysunku może się trochę różnić od opisu.</p>';
+  } else if (sh.tab === 'ruch' && sh.view === 'photo') {
     h += '<div class="photos' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + photoSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja startowa" class="ph0"><img src="' + photoSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja końcowa" class="ph1"><span class="phtag ph0">' + (f.sA || ['Start'])[0] + '</span><span class="phtag ph1">' + (f.sB || ['Koniec'])[0] + '</span></div>';
     h += '<div class="steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><span>1</span>' + (f.sA || ['Start'])[0] + '</button><button data-act="photo-k" data-k="2"><span>↻</span>Na zmianę</button><button data-act="photo-k" data-k="1"><span>2</span>' + (f.sB || ['Koniec'])[0] + '</button></div>';
     if (f.sA) h += '<p class="steptxt"><b>' + f.sA[0] + ':</b> ' + f.sA[1] + '</p>';
@@ -623,7 +631,7 @@ function viewSession() {
     (UI.wuOpen ? '<ul><li>3–5 min lekkiego cardio: rower, orbitrek, szybki marsz</li><li>Krążenia ramion i bioder, wymachy nóg po 10</li><li>10 przysiadów i 10 pompek bez obciążenia</li><li>Przed ciężkim ćwiczeniem zrób serie rozgrzewkowe pokazane przy nim</li></ul>' : '') + '</section>';
   h += '<section class="player" id="player"><div class="pl-head"><button class="pl-count" data-act="list" aria-haspopup="dialog">Ćwiczenie ' + (i + 1) + ' z ' + n + ' ▾</button><button class="btn sm ghost" data-act="tech" data-i="' + i + '">Zamień</button></div>' +
     '<h2 class="pl-name">' + ex.n + '</h2><div class="row"><span class="chip">' + q.sets.length + ' × ' + range(ex, q) + '</span><span class="chip">przerwa ' + mmss(q.rest) + '</span><span class="chip m">' + KINDN[ex.kind] + '</span>' + (ex.uni ? '<span class="chip m">na stronę</span>' : '') + '</div>' +
-    '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '">' + '<span class="inl photos' + (REDUCED ? ' still' : '') + '"><img class="ph0" src="' + photoSrc(ex, 0) + '" alt=""><img class="ph1" src="' + photoSrc(ex, 1) + '" alt=""></span>' + '<span class="inl-cap"><b>Technika i opis ›</b></span></button>' +
+    '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '">' + '<span class="inl photos' + (ex.ek ? ' ill' : '') + (REDUCED ? ' still' : '') + '"><img class="ph0" src="' + (ex.ek ? illSrc(ex, 0) : photoSrc(ex, 0)) + '" alt=""><img class="ph1" src="' + (ex.ek ? illSrc(ex, 1) : photoSrc(ex, 1)) + '" alt=""></span>' + '<span class="inl-cap"><b>Technika i opis ›</b></span></button>' +
     '<p class="hint' + (q.up ? ' up' : q.dl ? ' dl' : '') + '">' + (q.up ? '<span class="mono">↑</span>' : '') + '<span>' + q.hint + '</span></p>';
   if (ex.kind === 'bar' && !q.dl) { const rp = ramp(q.sets[0].kg); if (rp.length) h += '<div class="ramp"><span class="eyebrow">Rozgrzewka:</span>' + rp.map((r, j) => '<button data-act="wu" data-i="' + i + '" data-j="' + j + '" aria-pressed="' + !!(q.wu || [])[j] + '">' + fmt(r[0]) + '×' + r[1] + '</button>').join('') + '</div>'; }
   h += '<div class="setpills" role="group" aria-label="Serie">' + q.sets.map((x, j) => '<button class="sp' + (x.done ? ' done' : '') + (j === k ? ' sel' : '') + '" data-act="sel" data-i="' + i + '" data-k="' + j + '" aria-label="Seria ' + (j + 1) + (x.done ? ', zrobiona' : '') + '"><small>Seria ' + (j + 1) + '</small><span>' + (x.kg == null ? (x.reps ?? q.lo) + ' powt.' : fmt(x.kg) + '×' + (x.reps ?? '–')) + '</span></button>').join('') +
@@ -656,7 +664,7 @@ function viewRecovery() {
   return h + '</div>';
 }
 /* ---------- Exercises: pick a body part, then narrow down with simple filters ---------- */
-const PARTS = [['chestsh', 'Klatka i barki', ['chest', 'delts'], 'bench'], ['back', 'Plecy', ['back'], 'latpull'], ['arms', 'Ramiona', ['biceps', 'triceps'], 'curl'], ['legs', 'Nogi', ['quads', 'hams', 'calves'], 'squat'], ['glutes', 'Pośladki', ['glutes'], 'hipthrust'], ['abs', 'Brzuch', ['abs'], 'cablecrunch'], ['forearms', 'Przedramiona', ['forearms'], 'x_palms_up_barbell_wrist_curl_over_a_bench']];
+const PARTS = [['chestsh', 'Klatka i barki', ['chest', 'delts'], 'bench'], ['back', 'Plecy', ['back'], 'pullup'], ['arms', 'Ramiona', ['biceps', 'triceps'], 'curl'], ['legs', 'Nogi', ['quads', 'hams', 'calves'], 'squat'], ['glutes', 'Pośladki', ['glutes'], 'glutebridge'], ['abs', 'Brzuch', ['abs'], 'cablecrunch'], ['forearms', 'Przedramiona', ['forearms'], 'hammer']];
 const evBadge = e => (e.ev ? '<span class="evok" title="' + EV_NAME[e.ev.l] + '">✓ Badania</span>' : '');
 const exOrder = e => (e.ev ? (e.ev.l === 'A' ? 0 : 1) : 2);
 function exRows(list) {
@@ -681,7 +689,7 @@ function viewAtlas() {
   if (!part) {
     h += '<h2 class="step-t">Wybierz <em>partię</em></h2><div class="parts">' + PARTS.map(([k, l, ms, ph]) => {
       const all = Object.values(EX).filter(e => primary(e).some(m => ms.includes(m))); const nEv = all.filter(usable).length;
-      return '<button class="part" data-act="at-part" data-v="' + k + '"><span class="part-ph">' + (EX[ph] ? '<img src="' + photoSrc(EX[ph], 1) + '" alt="" loading="lazy">' : '') + '</span><b>' + l + '</b><span class="pn">' + exWord(all.length) + '</span>' + (nEv ? '<span class="pe">✓ ' + nEv + ' z badaniami</span>' : '<span class="pe muted">bez badań</span>') + '</button>';
+      return '<button class="part" data-act="at-part" data-v="' + k + '"><span class="part-ph">' + (EX[ph] ? (EX[ph].ek ? '<img class="ill" src="' + illSrc(EX[ph], 1) + '" alt="" loading="lazy">' : '<img src="' + photoSrc(EX[ph], 1) + '" alt="" loading="lazy">') : '') + '</span><b>' + l + '</b><span class="pn">' + exWord(all.length) + '</span>' + (nEv ? '<span class="pe">✓ ' + nEv + ' z badaniami</span>' : '<span class="pe muted">bez badań</span>') + '</button>';
     }).join('') + '</div><p class="muted small hint-p"><span class="evok">✓ Badania</span> = badania pokazały przyrost mięśni przy tym ćwiczeniu albo jego bliskim wariancie. Tylko takie ćwiczenia dobieram automatycznie.</p>';
     return h + '</div>';
   }
@@ -769,7 +777,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Twój Trener · wersja 1.11</p>';
+  h += '<p class="muted small center">Twój Trener · wersja 1.12</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -844,6 +852,7 @@ const SRC = [
   ['fabrykasily.pl: budowanie masy, podejście oparte na badaniach', 'https://www.fabrykasily.pl/treningi/budowanie-masy-miesniowej-aktualne-podejscie-oparte-na-badaniach'],
   ['budujmase.pl: 10 najlepszych ćwiczeń na masę', 'https://www.budujmase.pl/trening/10-najlepszych-cwiczen-na-mase-miesniowa.html'],
   ['Zdjęcia ćwiczeń: free-exercise-db (domena publiczna)', 'https://github.com/yuhonas/free-exercise-db'],
+  ['Ilustracje ćwiczeń: Everkinetic (CC BY-SA 4.0), przycięte i przebarwione', 'https://github.com/everkinetic/data'],
 ];
 const protein = bw => (bw ? Math.round(bw * 1.6) + '–' + Math.round(bw * 2) + ' g' : '–');
 function viewKnow() {

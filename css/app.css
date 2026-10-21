@@ -736,3 +736,29 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .bodymap .bm-sep{fill:none;stroke:var(--surface);stroke-width:.9;stroke-linecap:round;opacity:.9;pointer-events:none}
 .bodymap .mz{stroke:var(--surface);stroke-width:.8}
 .bodymap .bm-label{font:500 10px var(--body);fill:var(--muted)}
+
+/* ---------- 1.12: line illustrations (Everkinetic) ---------- */
+.photos.ill,.inl.photos.ill{background:radial-gradient(120% 90% at 50% 35%,#FFFFFF 0%,#F3F5F8 70%,#E6EAF0 100%)}
+.photos.ill{aspect-ratio:4/3.1;border-radius:16px;box-shadow:inset 0 0 0 1px rgba(16,20,32,.06)}
+.photos.ill img{padding:5% 7% 12%;box-sizing:border-box;object-fit:contain}
+.inl.photos.ill img{padding:5% 8% 14%;box-sizing:border-box;object-fit:contain}
+.photos.ill .phtag{background:rgba(22,26,38,.82);bottom:10px;white-space:nowrap}
+.photos.ill .phtag.ph0{left:10px}.photos.ill .phtag.ph1{left:auto;right:10px}
+.viewseg.n3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.viewseg.n3 button{font-size:13px;padding:0 4px}
+.frames{grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr);gap:8px}
+.frames button{flex-direction:column;min-height:0;padding:6px 6px 8px;gap:4px;border-radius:12px}
+.frames button img{width:100%;height:78px;object-fit:contain;background:#fff;border-radius:8px;padding:4px;box-sizing:border-box}
+.frames button span{width:auto;height:auto;background:none!important;border-radius:0;font:600 12px var(--body);display:flex;align-items:center;gap:5px;color:inherit!important}
+.frames button span i{font-style:normal;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--surface);font:600 11px var(--mono)}
+.frames button[aria-pressed="true"] span i{background:var(--accent);color:var(--accent-ink)}
+.frames button .auto{font-size:20px!important}
+.thumb img.ill,.part-ph img.ill{object-fit:contain!important;background:#fff;box-sizing:border-box}
+.thumb img.ill{padding:3px}
+.part-ph img.ill{padding:6% 10%}
+.ill-mus{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:center;padding:12px;border-radius:14px;background:var(--sunk)}
+.ill-map .bodymap{max-width:none}
+.ill-mus .row{gap:6px;margin-top:6px}
+.ill-mus .chip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--muscle);vertical-align:1px}
+.ill-mus .chip i.dot2{opacity:.4}
+.ill-mus .bodymap .mz.sec{opacity:.5}
