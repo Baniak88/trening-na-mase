@@ -130,3 +130,30 @@ export function headCoverage(ids, muscles) {
   for (const id of ids) { const hd = headsOf(EX[id]); for (const k in hd) if (k in out) out[k] = Math.max(out[k], hd[k]); }
   return out;
 }
+
+/* ---------- Muscle length: where an exercise loads the target muscle hardest ---------- */
+export const LENS = [
+  ['long', 'Rozciągnięty', 'Największy opór, gdy mięsień jest długi (np. dół ruchu przy wyproście nad głową, RDL, uginaniu nóg siedząc).'],
+  ['short', 'Skrócony', 'Największy opór w pełnym skurczu (np. góra hip thrustu, unoszenie bokiem z hantlami).'],
+  ['full', 'Pełny zakres', 'Opór rozłożony na cały ruch (wyciskania, ściągania, maszyny z krzywką).'],
+];
+export const LEN_NAME = {long: 'Rozciągnięty', short: 'Skrócony', full: 'Pełny zakres'};
+const LEN = {
+  // long: hardest with the muscle stretched; short: hardest when fully shortened
+  cablefly: 'long', cablerow: 'long', onearmrow: 'long', cablelat: 'long', inclinecurl: 'long', preacher: 'long',
+  triext: 'long', ropeoh: 'long', triext1: 'long', skull: 'long', ezskull: 'long',
+  squat: 'long', goblet: 'long', frontsquat: 'long', smithsquat: 'long', hack: 'long', bss: 'long', lunge: 'long', splitsquat: 'long', walklunge: 'long',
+  rdl: 'long', dbrdl: 'long', singlerdl: 'long', legcurl: 'long', nordic: 'long',
+  latraise: 'short', seatedlat: 'short', pushdown: 'short', pushdown1: 'short', lyingcurl: 'short',
+  hipthrust: 'short', dbthrust: 'short', glutebridge: 'short', singlebridge: 'short',
+};
+/** 'long' | 'short' | 'full' for an exercise. */
+export function lenOf(ex) {
+  if (!ex) return 'full';
+  if (LEN[ex.id]) return LEN[ex.id];
+  if (!ex.lib && !ex.hidden) return 'full';
+  const n = (ex.en || '').toLowerCase();
+  if (/overhead|behind the head|incline.*curl|stiff|romanian|good morning|pullover|fly|flye|deficit|sissy|nordic|glute ham|deep|full squat|split squat|lunge/.test(n)) return 'long';
+  if (/kickback|thrust|bridge|hip raise|butt lift|crunch|shrug|concentration|spider|lateral raise|side lateral|pushdown|leg extension|abduct|squeeze/.test(n)) return 'short';
+  return 'full';
+}

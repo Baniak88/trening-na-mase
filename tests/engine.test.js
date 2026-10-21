@@ -189,3 +189,14 @@ test('muscle heads: every evidence exercise is mapped and the planner covers dif
   const quads = fillDay(['quads'], {equipment: GYM}).map(x => x.id);
   assert.ok(!(quads.includes('legext') && quads.includes('legext1')), 'no near-duplicate variants');
 });
+
+test('muscle length: stretch, shortened and full-range exercises are told apart', async () => {
+  const {lenOf} = await import('../js/data/heads.js');
+  assert.equal(lenOf(EX.ropeoh), 'long');
+  assert.equal(lenOf(EX.legcurl), 'long');
+  assert.equal(lenOf(EX.lyingcurl), 'short');
+  assert.equal(lenOf(EX.hipthrust), 'short');
+  assert.equal(lenOf(EX.bench), 'full');
+  assert.equal(lenOf(EX.x_crunches), 'short', 'library by name');
+  for (const e of Object.values(EX)) assert.ok(['long', 'short', 'full'].includes(lenOf(e)), e.id);
+});

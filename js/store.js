@@ -17,7 +17,7 @@ export function defaultState() {
     v: 1,
     settings: {
       mode: 'auto', plan: 'fbw3', next: 0, profile: 'gym', duration: 60, focus: 'auto',
-      bar: 20, bw: 80, subs: {}, exclude: [], cycleStart: null, welcomed: false, updatedAt: 0, dayPick: null,
+      bar: 20, bw: 80, subs: {}, exclude: [], cycleStart: null, welcomed: false, updatedAt: 0, dayPick: null, theme: 'navy',
     },
     profiles: defaultProfiles(),
     customPlans: [],
@@ -63,7 +63,7 @@ export function migrate(d) {
   if (!d || typeof d !== 'object') return s;
   if (d.settings && typeof d.settings === 'object') {
     const o = d.settings;
-    for (const k of ['mode', 'plan', 'next', 'profile', 'duration', 'focus', 'bar', 'bw', 'cycleStart', 'welcomed', 'updatedAt']) if (o[k] != null) s.settings[k] = o[k];
+    for (const k of ['mode', 'plan', 'next', 'profile', 'duration', 'focus', 'bar', 'bw', 'cycleStart', 'welcomed', 'updatedAt', 'theme']) if (o[k] != null) s.settings[k] = o[k];
     if (o.subs && typeof o.subs === 'object') s.settings.subs = {...o.subs};
     if (Array.isArray(o.exclude)) s.settings.exclude = o.exclude.filter(id => EX[id]);
     if (o.plan === 'fbw') s.settings.plan = 'fbw3';
@@ -73,6 +73,7 @@ export function migrate(d) {
   if (!PLANS[s.settings.plan] && !s.customPlans.some(p => p.id === s.settings.plan)) s.settings.plan = 'fbw3';
   for (const k in s.settings.subs) if (!EX[s.settings.subs[k]]) delete s.settings.subs[k];
   if (!['auto', 'plan'].includes(s.settings.mode)) s.settings.mode = 'auto';
+  if (!['navy', 'light', 'system', 'dark'].includes(s.settings.theme)) s.settings.theme = 'navy';
   if (Array.isArray(d.profiles) && d.profiles.length) {
     s.profiles = d.profiles.filter(p => p && p.id && Array.isArray(p.equip)).map(p => ({id: String(p.id), name: String(p.name || 'Siłownia'), equip: p.equip.filter(e => ALL.includes(e))}));
     if (!s.profiles.length) s.profiles = defaultProfiles();

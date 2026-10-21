@@ -7,7 +7,7 @@ import {suggestLoad, sessionsOf, e1rm, fmt} from './engine/progression.js';
 import {WEEKDAYS, WD_SHORT, PRESETS, fillDay, dayName, weekDays, weekdayOf, nextDay} from './engine/planner.js';
 import {load, save, persist, exportJSON, importData, defaultState} from './store.js';
 import {bodyMap, targetMap} from './bodymap.js';
-import {HEADS, headName, headsOf, headWhy, mainHeads, headCoverage} from './data/heads.js';
+import {HEADS, headName, headsOf, headWhy, mainHeads, headCoverage, LENS, LEN_NAME, lenOf} from './data/heads.js';
 
 /* ---------- Helpers ---------- */
 const PLATES = [[25, '--p25', 44, 9], [20, '--p20', 44, 8], [15, '--p15', 40, 7], [10, '--p10', 34, 6], [5, '--p5', 26, 5], [2.5, '--p2', 22, 4], [1.25, '--p1', 18, 3]];
@@ -49,9 +49,11 @@ function headLine(ex) {
 
 /* ---------- State ---------- */
 const S = load();
+const applyTheme = () => { const t = S.settings.theme || 'navy'; if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.setAttribute('content', t === 'light' ? '#F2F2F7' : t === 'navy' ? '#1A1D29' : '#000000'); };
+applyTheme();
 if (!S.settings.cycleStart) S.settings.cycleStart = weekStart().toISOString();
 const UI = {stack: [], permSwap: false, tab: S.draft ? 'train' : 'home', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
-  aq: '', am: 'all', ah: 'all', ak: 'all', all: false, mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
+  aq: '', at: {part: null, m: null, head: null, len: null}, am: 'all', ah: 'all', ak: 'all', all: false, mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
 let saveT = null;
 function persistNow() { clearTimeout(saveT); save(S); }
 function persistSoon() { clearTimeout(saveT); saveT = setTimeout(() => save(S), 400); }
@@ -303,6 +305,7 @@ function exSheet() {
       for (const k in hd) { const m = k.split('.')[0]; (byM[m] = byM[m] || []).push([k, hd[k]]); }
       const ms = Object.keys(byM).sort((a, b) => (ex.m[b] || 0) - (ex.m[a] || 0));
       if (ms.length) h += '<div class="stack" style="gap:8px"><div class="sec-t">Które części mięśni</div><ul class="heads">' + ms.map(m => '<li><span class="hm">' + MUSCLES[m] + '</span><span class="hh">' + HEADS[m].map(([hk, hn]) => { const w = (byM[m].find(x => x[0] === m + '.' + hk) || [0, 0])[1]; return '<span class="hchip w' + (w >= 1 ? 2 : w > 0 ? 1 : 0) + '">' + hn + '</span>'; }).join('') + '</span></li>').join('') + '</ul><div class="legend small"><span><i class="hl2"></i>główny akcent</span><span><i class="hl1"></i>pomocniczo</span><span><i class="hl0"></i>słabo lub wcale</span></div>' + (headWhy(ex) ? '<p class="whytoday">' + headWhy(ex) + '</p>' : '') + '</div>'; }
+    { const L = lenOf(ex); h += '<div class="evi"><span class="lenico ' + L + '" aria-hidden="true"></span><div><b>Pozycja pracy mięśnia: ' + LEN_NAME[L].toLowerCase() + '</b><span class="small muted">' + LENS.find(x => x[0] === L)[2] + '</span></div></div>'; }
     if (!ex.ev) h += '<p class="notice small"><b>Bez badań przyrostu.</b> Nie dobieram go automatycznie, ale możesz dodać je do planu sam.</p>';
     if (ex.ev) { const src = SOURCES[ex.ev.s]; h += '<div class="evi"><span class="evb ' + ex.ev.l + '">' + ex.ev.l + '</span><div><b>' + EV_NAME[ex.ev.l] + '</b><a href="' + src[1] + '" target="_blank" rel="noopener">' + src[0] + '</a></div></div>'; }
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Sprzęt</div><p class="small">' + (ex.needs.length ? ex.needs.map(n => EQUIPMENT.find(e => e[0] === n)[1]).join(', ') : 'Bez sprzętu') + '</p></div>';
@@ -650,28 +653,65 @@ function viewRecovery() {
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Serie w ostatnich 7 dniach</div>' + volBars(wk, TRAINABLE) + '<div class="legend"><span><i style="background:var(--accent)"></i>zrobione serie</span><span><i style="background:var(--ok-soft);box-shadow:inset 0 0 0 1px var(--ok)"></i>zalecany zakres</span></div><p class="muted small">Ćwiczenie pomocnicze liczy się jako pół serii. Generator dokłada serie tam, gdzie brakuje ich do zakresu.</p></section>';
   return h + '</div>';
 }
-function viewAtlas() {
-  const q = UI.aq.trim().toLowerCase();
-  const muscles = UI.all ? TRAINABLE.concat('abs') : TRAINABLE;
-  if (!muscles.includes(UI.am)) UI.am = 'all';
-  const pool = Object.values(EX).filter(e => listable(e, UI.all));
-  if (UI.am === 'all' || !HEADS[UI.am] || !HEADS[UI.am].some(x => UI.am + '.' + x[0] === UI.ah)) UI.ah = 'all';
-  const list = pool.filter(e => (UI.am === 'all' || primary(e).includes(UI.am)) && (UI.ah === 'all' || mainHeads(e, UI.am).includes(UI.ah)) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())) && (!q || (e.n + ' ' + e.en + ' ' + Object.keys(e.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
-  const nEv = Object.values(EX).filter(usable).length;
-  let h = '<div class="atl-head"><div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Zakres"><button data-act="aall" data-v="0" aria-pressed="' + !UI.all + '">Z badaniami · ' + nEv + '</button><button data-act="aall" data-v="1" aria-pressed="' + UI.all + '">Wszystkie · ' + Object.keys(EX).length + '</button></div>' +
-    '<input class="search" id="aq" type="search" placeholder="Szukaj (po polsku lub angielsku)" value="' + esc(UI.aq) + '" aria-label="Szukaj ćwiczenia">' +
-    '<div class="filters" role="group" aria-label="Partia mięśni">' + [['all', 'Każda partia']].concat(muscles.map(m => [m, MUSCLES[m]])).map(([k, l]) => '<button class="pill" data-act="am" data-v="' + k + '" aria-pressed="' + (UI.am === k) + '">' + l + '</button>').join('') + '</div>' +
-    (UI.am !== 'all' && HEADS[UI.am] ? '<div class="filters" role="group" aria-label="Część mięśnia">' + [['all', 'Każda część']].concat(HEADS[UI.am].map(([k, l]) => [UI.am + '.' + k, l])).map(([k, l]) => '<button class="pill" data-act="ah" data-v="' + k + '" aria-pressed="' + (UI.ah === k) + '">' + l + '</button>').join('') + '</div>' : '') +
-    '<div class="filters" role="group" aria-label="Sprzęt"><button class="pill tog" data-act="mine" aria-pressed="' + UI.mine + '">' + (UI.mine ? '✓ ' : '') + 'Mój sprzęt</button>' + [['all', 'Każdy sprzęt']].concat(KINDS).map(([k, l]) => '<button class="pill" data-act="ak" data-v="' + k + '" aria-pressed="' + (UI.ak === k) + '">' + l + '</button>').join('') + '</div></div><div class="stack">';
-  h += '<p class="muted small">' + exWord(list.length) + '. <span class="evb A">A</span> badanie przyrostu z tym ćwiczeniem, <span class="evb B">B</span> bliski wariant lub program' + (UI.all ? ', <span class="evb N">–</span> bez badań (zdjęcia i opis z free-exercise-db)' : '') + '.</p>';
-  if (!list.length) h += '<p class="muted">Nic nie pasuje.</p><button class="btn" data-act="af-reset">Wyczyść filtry</button>';
-  const groups = UI.am === 'all' ? muscles : [UI.am];
+/* ---------- Exercises: step-by-step atlas (part → muscle → region → muscle length → exercises) ---------- */
+const PARTS = [['glutes', 'Pośladki', ['glutes']], ['legs', 'Nogi', ['quads', 'hams', 'calves']], ['chestsh', 'Klatka i barki', ['chest', 'delts']], ['back', 'Plecy', ['back']], ['arms', 'Ramiona', ['biceps', 'triceps']], ['abs', 'Brzuch', ['abs']]];
+const loadOf = ms => Object.fromEntries(ms.map(m => [m, 1]));
+const stepTitle = (a, b) => '<h2 class="step-t">' + a + ' <em>' + b + '</em></h2>';
+function atlasRows(list) {
   const order = e => (e.ev ? (e.ev.l === 'A' ? 0 : 1) : 2);
-  groups.forEach(m => {
-    const g = list.filter(e => (UI.am === 'all' ? primary(e)[0] === m : true)).sort((a, b) => order(a) - order(b)); if (!g.length) return;
-    h += '<section class="stack" style="gap:8px"><div class="sec-h">' + MUSCLES[m] + ' <span class="muted small">' + g.length + '</span></div><ul class="list">' + g.map(e => '<li><button class="lrow' + (S.settings.exclude.includes(e.id) ? ' off' : '') + '" data-act="sheet-open" data-id="' + e.id + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + e.n + '</b><span>' + KINDN[e.kind] + ' · ' + (headLine(e) || primary(e).map(k => MUSCLES[k]).join(', ')) + '</span></span>' + (e.ev ? '<span class="evb ' + e.ev.l + '" title="' + EV_NAME[e.ev.l] + '">' + e.ev.l + '</span>' : '<span class="evb N" title="Bez badań przyrostu">–</span>') + '</button></li>').join('') + '</ul></section>';
-  });
+  return '<ul class="list">' + list.sort((a, b) => order(a) - order(b)).map(e => '<li><button class="lrow' + (S.settings.exclude.includes(e.id) ? ' off' : '') + '" data-act="sheet-open" data-id="' + e.id + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + e.n + '</b><span>' + KINDN[e.kind] + ' · ' + (headLine(e) || primary(e).map(k => MUSCLES[k]).join(', ')) + ' · ' + LEN_NAME[lenOf(e)].toLowerCase() + '</span></span>' + (e.ev ? '<span class="evb ' + e.ev.l + '" title="' + EV_NAME[e.ev.l] + '">' + e.ev.l + '</span>' : '<span class="evb N" title="Bez badań przyrostu">–</span>') + '</button></li>').join('') + '</ul>';
+}
+function atlasFilters() {
+  return '<div class="filters" role="group" aria-label="Sprzęt"><button class="pill tog" data-act="mine" aria-pressed="' + UI.mine + '">' + (UI.mine ? '✓ ' : '') + 'Mój sprzęt</button>' + [['all', 'Każdy sprzęt']].concat(KINDS).map(([k, l]) => '<button class="pill" data-act="ak" data-v="' + k + '" aria-pressed="' + (UI.ak === k) + '">' + l + '</button>').join('') + '</div>';
+}
+function viewAtlas() {
+  const A = UI.at; const q = UI.aq.trim().toLowerCase();
+  const pool = Object.values(EX).filter(e => listable(e, UI.all) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())));
+  const nEv = Object.values(EX).filter(usable).length;
+  let h = '<div class="atl-head"><input class="search" id="aq" type="search" placeholder="Szukaj ćwiczenia" value="' + esc(UI.aq) + '" aria-label="Szukaj ćwiczenia">' +
+    '<div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Zakres"><button data-act="aall" data-v="0" aria-pressed="' + !UI.all + '">Z badaniami · ' + nEv + '</button><button data-act="aall" data-v="1" aria-pressed="' + UI.all + '">Wszystkie · ' + Object.keys(EX).length + '</button></div></div><div class="stack">';
+  if (q) {
+    const list = pool.filter(e => (e.n + ' ' + e.en + ' ' + Object.keys(e.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q));
+    return h + stepTitle('Wyniki', 'wyszukiwania') + '<p class="muted small">' + exWord(list.length) + '</p>' + (list.length ? atlasRows(list) : '<p class="muted">Nic nie pasuje.</p>') + '</div>';
+  }
+  const part = PARTS.find(p => p[0] === A.part);
+  if (part && part[2].length === 1) A.m = part[2][0];
+  const crumbs = [['part', part ? part[1] : null], ['m', A.m && part && part[2].length > 1 ? MUSCLES[A.m] : null], ['head', A.head ? (A.head === 'all' ? 'cały mięsień' : headName(A.head)) : null], ['len', A.len ? (A.len === 'any' ? 'dowolna pozycja' : LEN_NAME[A.len].toLowerCase()) : null]].filter(c => c[1]);
+  if (crumbs.length) h += '<nav class="crumbs" aria-label="Wybór"><button data-act="at-go" data-v="">Partie</button>' + crumbs.map(([k, l]) => '<span>›</span><button data-act="at-go" data-v="' + k + '">' + esc(l) + '</button>').join('') + '</nav>';
+  const step = (n, of) => '<div class="step-n">Krok ' + n + ' z ' + of + '</div>';
+  if (!part) {
+    h += step(1, 5) + stepTitle('Wybierz', 'partię') + '<div class="parts">' + PARTS.map(([k, l, ms]) => { const n = pool.filter(e => primary(e).some(m => ms.includes(m))).length; return '<button class="part" data-act="at-part" data-v="' + k + '"><span class="part-map">' + targetMap(loadOf(ms)) + '</span><b>' + l + '</b><span>' + (n ? exWord(n) : 'tylko w „Wszystkie”') + '</span></button>'; }).join('') + '</div>';
+    return h + '</div>';
+  }
+  if (!A.m) {
+    h += step(2, 5) + stepTitle('Wybierz', 'mięsień') + '<ul class="list">' + part[2].map(m => '<li><button class="lrow" data-act="at-m" data-v="' + m + '"><span class="mini-map">' + targetMap(loadOf([m])) + '</span><span class="lmain"><b>' + MUSCLES[m] + '</b><span>' + exWord(pool.filter(e => primary(e).includes(m)).length) + '</span></span><span class="chev">›</span></button></li>').join('') + '</ul>';
+    return h + '</div>';
+  }
+  const m = A.m; const ofM = pool.filter(e => primary(e).includes(m));
+  if (!HEADS[m]) { A.head = A.head || 'all'; A.len = A.len || 'any'; }
+  if (!A.head) {
+    h += step(3, 5) + stepTitle('Wybierz', 'region mięśnia') + '<ul class="list">' + [['all', 'Cały mięsień', 'wszystkie części']].concat(HEADS[m].map(([k, l]) => [m + '.' + k, l.charAt(0).toUpperCase() + l.slice(1), ''])).map(([k, l]) => { const n = k === 'all' ? ofM.length : ofM.filter(e => mainHeads(e, m).includes(k)).length; return '<li><button class="lrow" data-act="at-head" data-v="' + k + '"' + (n ? '' : ' disabled') + '><span class="lmain"><b>' + l + '</b><span>' + (n ? exWord(n) : 'brak ćwiczeń z badaniami') + '</span></span><span class="chev">›</span></button></li>'; }).join('') + '</ul>';
+    return h + '</div>';
+  }
+  const ofH = A.head === 'all' ? ofM : ofM.filter(e => mainHeads(e, m).includes(A.head));
+  if (!A.len) {
+    h += step(4, 5) + stepTitle('Wybierz', 'pozycję mięśnia') + '<ul class="list">' + LENS.concat([['any', 'Dowolna', 'Wszystkie ćwiczenia na wybrany region.']]).map(([k, l, d]) => { const n = k === 'any' ? ofH.length : ofH.filter(e => lenOf(e) === k).length; return '<li><button class="lrow" data-act="at-len" data-v="' + k + '"' + (n ? '' : ' disabled') + '><span class="lenico ' + k + '" aria-hidden="true"></span><span class="lmain"><b>' + l + '</b><span>' + d + ' ' + (n ? exWord(n) : 'Brak ćwiczeń.') + '</span></span><span class="chev">›</span></button></li>'; }).join('') + '</ul>' +
+      '<p class="muted small hint-p">Ćwiczenia z oporem w pozycji rozciągniętej często dają większy przyrost danego regionu (np. Maeo 2021 i 2023, Kassiano 2025). Najlepiej łączyć różne pozycje.</p>';
+    return h + '</div>';
+  }
+  const list = A.len === 'any' ? ofH : ofH.filter(e => lenOf(e) === A.len);
+  h += step(5, 5) + stepTitle('Ćwiczenia', (A.head === 'all' ? MUSCLES[m] : headName(A.head)) + (A.len === 'any' ? '' : ', ' + LEN_NAME[A.len].toLowerCase())) + atlasFilters() + '<p class="muted small">' + exWord(list.length) + '. <span class="evb A">A</span> badanie przyrostu z tym ćwiczeniem, <span class="evb B">B</span> bliski wariant lub program' + (UI.all ? ', <span class="evb N">–</span> bez badań' : '') + '.</p>' + (list.length ? atlasRows(list) : '<p class="muted">Nic nie pasuje. Zmień sprzęt albo włącz „Wszystkie”.</p>');
   return h + '</div>';
+}
+/** One step back in the atlas; returns false when already at the first step. */
+function atlasBack() {
+  const A = UI.at; const part = PARTS.find(p => p[0] === A.part);
+  if (UI.aq) { UI.aq = ''; return true; }
+  if (A.len) { A.len = null; if (!HEADS[A.m]) { A.head = null; if (part && part[2].length === 1) { A.part = null; A.m = null; } else A.m = null; } return true; }
+  if (A.head) { A.head = null; if (part && part[2].length === 1) { A.part = null; A.m = null; } return true; }
+  if (A.m && part && part[2].length > 1) { A.m = null; return true; }
+  if (A.part) { A.part = null; A.m = null; return true; }
+  return false;
 }
 function viewProgress() {
   const ws = S.workouts.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -731,13 +771,14 @@ function viewSettings() {
   h += '<section class="card stack" style="gap:10px"><div class="row" style="justify-content:space-between"><div class="sec-t">Cykl 6 tygodni</div><span class="chip">tydzień ' + (wk + 1) + '</span></div>' + cycleBar(wk) +
     '<div class="cycgrid">' + CYCLE.map((c, i) => '<div' + (i === wk ? ' class="now"' : '') + '><b>T' + (i + 1) + '</b><span>' + (c.deload ? 'lżej' : 'RIR ' + c.rir) + '</span></div>').join('') + '</div>' +
     '<p class="muted small">Wysiłek rośnie z tygodnia na tydzień, co 6. tydzień jest lżejszy.</p><button class="btn sm" data-act="cycle-reset">Zacznij cykl od tego tygodnia</button></section>';
+  h += '<section class="card stack" style="gap:10px"><div class="sec-t">Wygląd</div><div class="seg" style="grid-template-columns:repeat(3,1fr)" role="group" aria-label="Motyw">' + [['navy', 'Granatowy'], ['light', 'Jasny'], ['system', 'Jak telefon']].map(([k, l]) => '<button data-act="set-theme" data-v="' + k + '" aria-pressed="' + ((st.theme || 'navy') === k) + '">' + l + '</button>').join('') + '</div></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Gryf</div><div class="seg" style="grid-template-columns:repeat(3,1fr)">' + [20, 15, 10].map(b => '<button data-act="set-bar" data-v="' + b + '" aria-pressed="' + (st.bar === b) + '">' + b + ' kg</button>').join('') + '</div><p class="muted small">Do kalkulatora talerzy przy ćwiczeniach ze sztangą.</p></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Twoje dane</div><p class="muted small">Treningi zapisują się tylko w tym telefonie (' + S.workouts.length + ' treningów). Zrób kopię, żeby przenieść je na inne urządzenie.</p>' +
     '<div class="row"><button class="btn sm" data-act="export">Zapisz kopię (plik)</button><label class="btn sm ghost filebtn">Wczytaj kopię<input type="file" id="importFile" accept="application/json,.json" hidden></label></div>' +
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Twój Trener · wersja 1.8</p>';
+  h += '<p class="muted small center">Twój Trener · wersja 1.9</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -844,6 +885,8 @@ function renderBar() {
     sub = '<div class="steps-strip" role="group" aria-label="Ćwiczenia w treningu">' + d.ex.map((q, i) => '<button class="dot' + (exDone(q) ? ' done' : '') + (i === cur ? ' cur' : '') + '" data-act="go-ex" data-i="' + i + '" aria-label="' + (i + 1) + '. ' + EX[q.id].n + (exDone(q) ? ', zrobione' : '') + '"' + (i === cur ? ' aria-current="step"' : '') + '>' + (exDone(q) ? '✓' : i + 1) + '</button>').join('') + '</div><div class="progress thin" aria-label="' + c + ' z ' + tt + ' serii"><b style="width:' + (tt ? c / tt * 100 : 0) + '%"></b></div>';
   } else if (UI.sub) {
     left = '<button class="ab-back" data-act="back" aria-label="Wróć">‹</button><span class="ab-title">' + (UI.sub === 'settings' ? 'Ustawienia' : UI.sub === 'planedit' ? 'Twój plan' : 'Wiedza') + '</span>';
+  } else if (UI.tab === 'atlas' && (UI.at.part || UI.aq)) {
+    left = '<button class="ab-back" data-act="at-back" aria-label="Wróć">‹</button><span class="ab-title">' + TITLES[UI.tab] + '</span>';
   } else if (UI.tab === 'recovery') {
     left = '<button class="ab-back" data-act="go" data-tab="home" aria-label="Wróć">‹</button><span class="ab-title">' + TITLES[UI.tab] + '</span>';
   } else {
@@ -923,6 +966,7 @@ function onAct(ev) {
     case 'pe-cancel': UI.peDel = null; render(); break;
     case 'pe-del-yes': { const id = UI.pe; S.customPlans = S.customPlans.filter(c => c.id !== id); if (S.settings.plan === id) { S.settings.plan = 'fbw3'; S.settings.next = 0; } S.today = null; UI.peDel = null; UI.sub = 'settings'; persistNow(); render(); toast('Plan usunięty'); break; }
     case 'pe-use': setting('mode', 'plan'); setting('plan', UI.pe); setting('next', 0); S.today = null; render(); toast('Używasz planu: ' + curPlan().name); break;
+    case 'set-theme': setting('theme', v); applyTheme(); render(); break;
     case 'set-bar': setting('bar', +v); render(); break;
     case 'shuffle': reshuffle(); render(); toast('Nowy zestaw ćwiczeń'); break;
     case 'today-ex': openSheet(b.dataset.id, {from: 'today', idx: +b.dataset.idx}); break;
@@ -977,11 +1021,17 @@ function onAct(ev) {
     case 'wipe-yes': { const fresh = defaultState(); Object.keys(S).forEach(k => delete S[k]); Object.assign(S, fresh); S.settings.cycleStart = weekStart().toISOString(); UI.wipe = false; persistNow(); stopRest(); render(); toast('Dane usunięte'); break; }
     case 'am': UI.am = v; render(); break;
     case 'ak': UI.ak = v; render(); break;
+    case 'at-back': atlasBack(); render(); window.scrollTo(0, 0); break;
+    case 'at-part': UI.at = {part: v, m: null, head: null, len: null}; render(); window.scrollTo(0, 0); break;
+    case 'at-m': UI.at.m = v; UI.at.head = null; UI.at.len = null; render(); window.scrollTo(0, 0); break;
+    case 'at-head': UI.at.head = v; UI.at.len = null; render(); window.scrollTo(0, 0); break;
+    case 'at-len': UI.at.len = v; render(); window.scrollTo(0, 0); break;
+    case 'at-go': { const A = UI.at; if (!v) UI.at = {part: null, m: null, head: null, len: null}; else if (v === 'part') { A.m = (PARTS.find(p => p[0] === A.part) || [0, 0, []])[2].length === 1 ? A.m : null; A.head = null; A.len = null; } else if (v === 'm') { A.head = null; A.len = null; } else if (v === 'head') A.len = null; render(); window.scrollTo(0, 0); break; }
     case 'ah': UI.ah = v; render(); break;
     case 'pe-add': addExercise('plan', b.dataset.id, +b.dataset.d); break;
     case 'aall': UI.all = v === '1'; render(); window.scrollTo(0, 0); break;
     case 'mine': UI.mine = !UI.mine; render(); break;
-    case 'af-reset': UI.am = 'all'; UI.ak = 'all'; UI.aq = ''; UI.mine = false; render(); break;
+    case 'af-reset': UI.at = {part: null, m: null, head: null, len: null}; UI.ak = 'all'; UI.aq = ''; UI.mine = false; render(); break;
     case 'openw': UI.openW = UI.openW === b.dataset.id ? null : b.dataset.id; UI.delW = null; render(); break;
     case 'delw': UI.delW = b.dataset.id; render(); break;
     case 'delw-no': UI.delW = null; render(); break;
@@ -1046,6 +1096,7 @@ window.tnmBack = () => {
   if (UI.sheet) { closeSheet(); return true; }
   if (UI.sub) { subBack(); return true; }
   if (UI.cfgOpen) { UI.cfgOpen = false; render(); return true; }
+  if (UI.tab === 'atlas' && atlasBack()) { render(); window.scrollTo(0, 0); return true; }
   if (UI.tab !== 'home') { UI.tab = 'home'; render(); window.scrollTo(0, 0); return true; }
   return false;
 };
