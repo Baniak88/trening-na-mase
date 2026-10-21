@@ -1,4 +1,4 @@
-# Twój Trener
+# Mój Trener
 
 Aplikacja treningowa (repozytorium `trening-na-mase`).
 
@@ -8,20 +8,21 @@ Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na ka�
 
 ## Co potrafi
 
-- **Ekran startowy z menu:** dzisiejszy trening z przyciskiem startu i kafle: Trening na dziś, Plan tygodnia, Ćwiczenia, Regeneracja, Postępy, Wiedza, Ustawienia. Dolny pasek: Start, Trening, Plan, Ćwiczenia, Postępy.
+- **Ekran startowy z menu:** dzisiejszy trening z przyciskiem startu i kafle: Plan tygodnia, Trener AI, Ćwiczenia, Regeneracja, Postępy, Wiedza, Ustawienia. Dolny pasek: Start, Trening, Plan, Ćwiczenia, Postępy.
 
+- **Trener AI:** czat z trenerem, który zna Twój plan, ostatnie treningi i regenerację. Działa na Twoim kluczu API: Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google) albo dowolny serwer zgodny z OpenAI (OpenRouter, Ollama, LM Studio). Poproś o plan, a wgrasz go jednym dotknięciem. Klucz i rozmowy zostają w telefonie i nie trafiają do kopii danych.
+- **Polski i angielski:** język dopasowuje się do języka telefonu (polski na telefonach po polsku, angielski na pozostałych); można go zmienić w Ustawieniach.
 - **Plan tygodnia na ekranie głównym.** Dotykasz dnia i zaznaczasz partie mięśni, np. poniedziałek: klatka + biceps, środa: barki + triceps. Ćwiczenia dobierają się same (możesz je zmienić), a ekran główny pokazuje trening na dzisiejszy dzień tygodnia. W dni wolne widać, kiedy jest następny trening.
 - **Tylko ćwiczenia z badaniami przyrostu.** 74 ćwiczenia (od 4 na łydki do kilkunastu na każdą dużą partię): A = ćwiczenie trenowane w badaniu, które zmierzyło przyrost mięśni; B = bliski wariant albo program z tym ćwiczeniem. Źródło widać przy każdym ćwiczeniu. Ćwiczenia bez takich danych (np. face pull, deska, spacer farmera) są ukryte.
-- **Atlas ćwiczeń:** 590 ćwiczeń ze zdjęciami. Wybierasz partię (zdjęcie), a potem zawężasz filtrami: mięsień, część mięśnia, pozycja pracy (rozciągnięty, skrócony, pełny zakres), sprzęt. Ćwiczenia potwierdzone badaniami mają zielony znaczek „✓ Badania” i są na górze listy. Granatowy motyw (do zmiany w Ustawieniach).
-- **Biblioteka jak w Jefit:** ponad 500 ćwiczeń z filtrami po partii i sprzęcie (sztanga, hantle, maszyna, wyciąg, masa ciała, kettlebell, guma). 74 z badaniami przyrostu są domyślne i tylko one trafiają do automatycznego doboru; resztę (zdjęcia i angielski opis z free-exercise-db) możesz dodać do planu ręcznie.
+- **Atlas ćwiczeń:** ok. 270 ćwiczeń, każde z tym samym rodzajem rysunku techniki. Wybierasz partię (zdjęcie), a potem zawężasz filtrami: mięsień, część mięśnia, pozycja pracy (rozciągnięty, skrócony, pełny zakres), sprzęt. Ćwiczenia potwierdzone badaniami mają zielony znaczek „✓ Badania” i są na górze listy. Granatowy motyw (do zmiany w Ustawieniach).
+- **Biblioteka:** ćwiczenia z filtrami po partii i sprzęcie. Te z badaniami przyrostu są domyślne i tylko one trafiają do automatycznego doboru; resztę możesz dodać do planu ręcznie. Na liście są tylko ćwiczenia z rysunkiem, żeby wszystkie wyglądały tak samo.
 - **Głowy mięśni:** przy każdym ćwiczeniu widać, którą część mięśnia akcentuje (np. triceps: głowa długa przy ramieniu nad głową) i dlaczego, z odniesieniem do badań. Plan dnia pokazuje, które części wybranych mięśni mają swoje ćwiczenie, a dobór ćwiczeń celowo łapie różne głowy.
 - **Prosty wygląd** w stylu iOS: duże tytuły, listy grupowane, jasny i ciemny motyw.
 - **Trening na dziś generowany automatycznie.** Wybiera wypoczęte partie mięśni, dobiera ćwiczenia do sprzętu i mieści się w wybranym czasie (30–90 min). Możesz wymusić zakres: całe ciało, góra, dół, push, pull, nogi.
 - **Mapa regeneracji.** Sylwetka z przodu i z tyłu pokazuje kolorami, które mięśnie są gotowe, a które jeszcze odpoczywają, i za ile godzin wrócą do formy.
 - **Siłownie ze sprzętem.** Np. „Siłownia” i „Dom”. Generator proponuje tylko ćwiczenia, które zrobisz w danym miejscu.
-- **Ćwiczenia z animacją techniki:** linie kontrolne, fazy ruchu, typowe błędy pokazane na animacji, wskazówki i zamienniki.
-- **Ilustracje ćwiczeń:** czyste rysunki pozycji rozciągnięcia i spięcia (animowane na zmianę) dla 143 ćwiczeń, z mapą pracujących mięśni. Źródło: [Everkinetic](https://github.com/everkinetic/data), licencja CC BY-SA 4.0 (pliki przycięte, szczegóły w `img/ek/LICENSE.md`).
-- **Zdjęcia ćwiczeń:** prawdziwe zdjęcia pozycji startowej i końcowej dla każdego ćwiczenia, z [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (domena publiczna).
+- **Rysunki techniki:** jeden styl dla wszystkich ćwiczeń: dwie pozycje ruchu animowane na zmianę, mapa pracujących mięśni, wskazówki, typowe błędy i zamienniki. Gdy rysunek pokazuje bliski wariant (np. wyciskanie siedząc zamiast stojąc), aplikacja to opisuje. Źródło: [Everkinetic](https://github.com/everkinetic/data), licencja CC BY-SA 4.0 (pliki przycięte, szczegóły w `img/ek/LICENSE.md`).
+- **Zdjęcia ćwiczeń** (dodatkowy widok): zdjęcia pozycji startowej i końcowej, z [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (domena publiczna).
 - **Trening krok po kroku:** jedno ćwiczenie na ekranie, duże przyciski do ciężaru i powtórzeń, timer przerwy z dźwiękiem, serie rozgrzewkowe, kalkulator talerzy.
 - **Progresja:** podwójna progresja (najpierw powtórzenia, potem ciężar), rekordy, szacowany 1RM, wykresy postępów.
 - **Cykl 6 tygodni:** wysiłek rośnie co tydzień, 6. tydzień jest lżejszy.

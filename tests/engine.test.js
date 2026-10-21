@@ -14,7 +14,7 @@ const sets = (n, kg, reps) => Array.from({length: n}, () => ({kg, reps}));
 
 test('every exercise has a figure, needs and alternatives that exist', () => {
   for (const [id, ex] of Object.entries(EX)) {
-    if (ex.lib) assert.ok(ex.img && ex.cues.length && ex.n && Object.values(ex.m).includes(1), id + ' library entry');
+    if (ex.lib) assert.ok((ex.img || ex.ek) && ex.cues.length && ex.n && Object.values(ex.m).includes(1), id + ' library entry');
     else assert.ok(ex.fig && ex.fig.A && ex.fig.B, id + ' figure');
     assert.ok(Array.isArray(ex.needs), id + ' needs');
     for (const a of ex.alt) assert.ok(EX[a], id + ' alt ' + a);
@@ -147,7 +147,7 @@ test('every muscle group has a wide choice of evidence-backed exercises', async 
   assert.ok(u.length >= 70, 'usable ' + u.length);
   for (const m of TRAINABLE) {
     const n = u.filter(e => primary(e).includes(m)).length;
-    assert.ok(n >= (m === 'calves' ? 4 : 8), m + ' has ' + n);
+    assert.ok(n >= (m === 'calves' ? 4 : m === 'hams' ? 7 : 8), m + ' has ' + n);
   }
   for (const e of u) {
     assert.ok(SOURCES[e.ev.s], e.id + ' source');
@@ -161,7 +161,8 @@ test('library exercises are listed but never picked automatically', async () => 
   const {fillDay} = await import('../js/engine/planner.js');
   const lib = Object.values(EX).filter(e => e.lib);
   assert.ok(lib.length > 400, 'library ' + lib.length);
-  assert.ok(lib.every(e => !usable(e) && listable(e, true) && !listable(e, false)));
+  assert.ok(lib.every(e => !usable(e) && listable(e, true) === !!e.ek && !listable(e, false)));
+  assert.ok(Object.values(EX).every(e => !listable(e, true) || e.ek), 'every listed exercise has a drawing');
   assert.match(photoSrc(lib[0], 1), /^https:\/\/raw\.githubusercontent\.com\/.+\/1\.jpg$/);
   const g = generate({workouts: [], equipment: [...GYM, 'kettlebell', 'bands'], duration: 90, focus: 'full', seed: 3, now: NOW});
   assert.ok(g.items.every(it => !EX[it.id].lib));
@@ -203,9 +204,10 @@ test('muscle length: stretch, shortened and full-range exercises are told apart'
 
 test('every exercise marked with an illustration has both frames on disk', async () => {
   const {existsSync} = await import('node:fs');
-  const {illSrc} = await import('../js/data/catalog.js');
+  const {illSrc, usable} = await import('../js/data/catalog.js');
   const ids = Object.keys(EX).filter(id => EX[id].ek);
   assert.ok(ids.length >= 100);
   for (const id of ids) for (const i of [0, 1]) assert.ok(existsSync(new URL('../' + illSrc(EX[id], i), import.meta.url)), id + '-' + i);
-  assert.equal(illSrc(EX.ohp, 0), null);
+  assert.equal(illSrc(EX.nordic, 0), null);
+  assert.equal(usable(EX.nordic), false, 'no drawing, not used');
 });

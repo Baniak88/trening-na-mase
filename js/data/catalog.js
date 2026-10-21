@@ -1,5 +1,6 @@
-/* Exercise catalog: 84 exercises (74 with evidence of muscle growth) with technique figures, coaching marks and faults. Ported from the prototype. */
+/* Exercise catalog: curated exercises with evidence of muscle growth with technique figures, coaching marks and faults. Ported from the prototype. */
 import {LIB} from './library.js';
+import {ART, VARIANT, EXTRA} from './art.js';
 /* ---------- Muscles, exercises, plans ---------- */
 const MUSCLES={chest:'Klatka',back:'Plecy',delts:'Barki',biceps:'Biceps',triceps:'Triceps',quads:'Czworogłowe',hams:'Dwugłowe ud',glutes:'Pośladki',calves:'Łydki',abs:'Brzuch',forearms:'Przedramiona'};
 const PATTERNS=[['knee','Przysiad i wykrok'],['hinge','Zawias biodrowy'],['hpush','Pchanie poziome'],['vpush','Pchanie pionowe'],['hpull','Przyciąganie poziome'],['vpull','Przyciąganie pionowe'],['iso','Izolacja: ramiona, barki, nogi'],['core','Core i noszenie']];
@@ -705,6 +706,9 @@ const NEEDS={squat:['barbell'],goblet:['dumbbells'],bss:['dumbbells','bench'],lu
  dbohp:['dumbbells','bench'],hammer:['dumbbells'],inclinecurl:['dumbbells','bench'],dbrdl:['dumbbells'],stepup:['dumbbells','bench'],skull:['dumbbells','bench']};
 Object.assign(NEEDS,NEEDS2);
 for(const id in EX){if(!NEEDS[id])throw new Error('Brak sprzętu dla '+id);EX[id].needs=NEEDS[id];EX[id].id=id;}
+/** Drawing of an exercise: [drawing id, variant note key] (see art.js). */
+const artOf=id=>{const a=ART[id];return !a?[null,null]:typeof a==='string'?[a,null]:a;};
+for(const id in EX)[EX[id].ek,EX[id].ekv]=artOf(id);
 /** Exercise is doable with the given equipment list. */
 export const canDo=(ex,equip)=>ex.needs.every(n=>equip.includes(n));
 /** Compound = multi-joint pattern (not isolation/core). */
@@ -758,7 +762,8 @@ const EVID={
  ropeoh:['A','maeo23t'],pushdown:['A','maeo23t'],triext:['B','maeo23t'],skull:['B','maeo23t'],
 };
 export const EV_NAME={A:'Badanie przyrostu',B:'Zbadany wariant lub program'};
-for(const id in EX){const e=EVID[id];EX[id].ev=e?{l:e[0],s:e[1]}:null;EX[id].hidden=!e;}
+/* Hidden: no growth evidence, or no drawing (every listed exercise has the same kind of drawing). */
+for(const id in EX){const e=EVID[id];EX[id].ev=e?{l:e[0],s:e[1]}:null;EX[id].hidden=!e||!EX[id].ek;}
 /** Exercise has evidence of muscle growth and may be suggested. */
 export const usable=ex=>!!ex&&!ex.hidden;
 /** Muscles that have at least one usable exercise as a main mover. */
@@ -780,14 +785,15 @@ for(const id in EX)EX[id].photo='img/ex/'+id;
 const RAW='https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
 const LIB_INC={bar:2.5,db:2,machine:5,cable:2.5,bw:2.5,kb:4,band:1,ball:1,other:2.5};
 for(const o of LIB)EX[o.id]={...o,inc:LIB_INC[o.kind],err:[],alt:[],fig:null,lib:true,ev:null,hidden:true};
+for(const {ek,...o} of EXTRA){if(EX[o.id])throw new Error('Duplicate id '+o.id);EX[o.id]={...o,img:null,inc:LIB_INC[o.kind],err:[],alt:[],fig:null,lib:true,ev:null,hidden:true,ek,ekv:null};}
+for(const o of LIB)[EX[o.id].ek,EX[o.id].ekv]=artOf(o.id);
 /** Photo i (0 = start, 1 = end) of an exercise. */
-export const photoSrc=(ex,i)=>ex.lib?RAW+ex.img+'/'+i+'.jpg':ex.photo+'-'+i+'.jpg';
-/* Line illustrations from Everkinetic (CC BY-SA 4.0), cropped and recoloured: img/ek/<id>-0.svg (stretch) and -1.svg (contraction). */
+export const photoSrc=(ex,i)=>ex.lib?(ex.img?RAW+ex.img+'/'+i+'.jpg':null):ex.photo+'-'+i+'.jpg';
+/* Line illustrations from Everkinetic (CC BY-SA 4.0), see art.js. */
+export {VARIANT};
 export const ILL_CREDIT=['Everkinetic','https://github.com/everkinetic/data','CC BY-SA 4.0','https://creativecommons.org/licenses/by-sa/4.0/'];
-const EK_IDS='squat lunge legext deadlift rdl legcurl calf bench dbbench incline pushup latraise row dbrow cablerow pullup curl triext pushdown legpress hack chestpress lyingcurl seatedcalf cablefly cablecurl inclinecurl dbrdl skull inclinebar smithbench smithincl closepull tbar preacher barcurl ezcurl conc cablecurl1 cgbench ezskull triext1 frontsquat smithsquat walklunge hipext lpcalf dips hammer stepup straightpd pushdown1 cablecrunch glutebridge bss x_alternate_incline_dumbbell_curl x_barbell_ab_rollout x_barbell_ab_rollout_on_knees x_barbell_hack_squat x_barbell_lunge x_barbell_rear_delt_row x_barbell_seated_calf_raise x_barbell_shrug x_barbell_squat_to_a_bench x_barbell_step_ups x_bench_dips x_bent_arm_dumbbell_pullover x_bent_knee_hip_raise x_bent_over_dumbbell_rear_delt_raise_with_head_on_bench x_cable_incline_pushdown x_cable_internal_rotation x_cable_lying_triceps_extension x_cable_preacher_curl x_cable_seated_crunch x_calf_raises_with_bands x_close_grip_ez_bar_curl_with_band x_close_grip_standing_barbell_curl x_cross_body_crunch x_cross_over_with_bands x_crunches x_decline_close_grip_bench_to_skull_crusher x_decline_crunch x_decline_dumbbell_flyes x_decline_dumbbell_triceps_extension x_decline_oblique_crunch x_dumbbell_alternate_bicep_curl x_dumbbell_flyes x_dumbbell_lying_one_arm_rear_lateral_raise x_dumbbell_one_arm_shoulder_press x_dumbbell_prone_incline_curl x_dumbbell_seated_one_leg_calf_raise x_dumbbell_side_bend x_dumbbell_squat x_dumbbell_squat_to_a_bench x_flat_bench_cable_flyes x_flexor_incline_dumbbell_curls x_flutter_kicks x_front_barbell_squat x_front_barbell_squat_to_a_bench x_front_cable_raise x_front_dumbbell_raise x_high_cable_curls x_incline_cable_flye x_incline_dumbbell_flyes x_jm_press x_low_cable_crossover x_lying_close_grip_barbell_triceps_press_to_chin x_lying_high_bench_barbell_curl x_lying_machine_squat x_lying_supine_dumbbell_curl x_machine_bench_press x_machine_bicep_curl x_machine_preacher_curls x_machine_triceps_extension x_narrow_stance_hack_squats x_narrow_stance_leg_press x_one_legged_cable_kickback x_one_leg_barbell_squat x_overhead_cable_curl x_plie_dumbbell_squat x_reverse_grip_triceps_pushdown x_rocking_standing_calf_raise x_seated_close_grip_concentration_barbell_curl x_seated_dumbbell_curl x_smith_machine_reverse_calf_raises x_smith_machine_upright_row x_standing_barbell_calf_raise x_standing_leg_curl x_standing_one_arm_dumbbell_curl_over_incline_bench x_straight_arm_dumbbell_pullover x_thigh_abductor x_thigh_adductor x_tricep_dumbbell_kickback x_upright_barbell_row x_upright_cable_row x_upright_row_with_bands x_wide_grip_decline_barbell_pullover x_wide_grip_standing_barbell_curl x_wide_stance_barbell_squat x_zercher_squats x_donkey_calf_raises x_exercise_ball_pull_in x_weighted_ball_side_bend'.split(' ');
-for(const id of EK_IDS)if(EX[id])EX[id].ek=true;
 /** Illustration i (0 = stretched position, 1 = contracted) of an exercise, or null. */
-export const illSrc=(ex,i)=>ex.ek?'img/ek/'+ex.id+'-'+i+'.svg':null;
+export const illSrc=(ex,i)=>ex&&ex.ek?'img/ek/'+ex.ek+'-'+i+'.svg':null;
 /** Every exercise that can be listed: with evidence first, the rest when the user asks for all. */
-export const listable=(ex,all)=>usable(ex)||(!!all&&!!ex);
+export const listable=(ex,all)=>usable(ex)||(!!all&&!!ex&&!!ex.ek);
 export {MUSCLES,PATTERNS,EX,PLANS,CYCLE,KINDS};

@@ -17,13 +17,15 @@ export function defaultState() {
     v: 1,
     settings: {
       mode: 'auto', plan: 'fbw3', next: 0, profile: 'gym', duration: 60, focus: 'auto',
-      bar: 20, bw: 80, subs: {}, exclude: [], cycleStart: null, welcomed: false, updatedAt: 0, dayPick: null, theme: 'navy',
+      bar: 20, bw: 80, subs: {}, exclude: [], cycleStart: null, welcomed: false, updatedAt: 0, dayPick: null, theme: 'navy', lang: 'auto',
     },
     profiles: defaultProfiles(),
     customPlans: [],
     workouts: [],
     draft: null,
     today: null,
+    ai: {provider: 'anthropic', key: '', model: '', base: ''},
+    chat: [],
   };
 }
 
@@ -63,7 +65,7 @@ export function migrate(d) {
   if (!d || typeof d !== 'object') return s;
   if (d.settings && typeof d.settings === 'object') {
     const o = d.settings;
-    for (const k of ['mode', 'plan', 'next', 'profile', 'duration', 'focus', 'bar', 'bw', 'cycleStart', 'welcomed', 'updatedAt', 'theme']) if (o[k] != null) s.settings[k] = o[k];
+    for (const k of ['mode', 'plan', 'next', 'profile', 'duration', 'focus', 'bar', 'bw', 'cycleStart', 'welcomed', 'updatedAt', 'theme', 'lang']) if (o[k] != null) s.settings[k] = o[k];
     if (o.subs && typeof o.subs === 'object') s.settings.subs = {...o.subs};
     if (Array.isArray(o.exclude)) s.settings.exclude = o.exclude.filter(id => EX[id]);
     if (o.plan === 'fbw') s.settings.plan = 'fbw3';
@@ -74,6 +76,7 @@ export function migrate(d) {
   for (const k in s.settings.subs) if (!EX[s.settings.subs[k]]) delete s.settings.subs[k];
   if (!['auto', 'plan'].includes(s.settings.mode)) s.settings.mode = 'auto';
   if (!['navy', 'light', 'system', 'dark'].includes(s.settings.theme)) s.settings.theme = 'navy';
+  if (!['auto', 'pl', 'en'].includes(s.settings.lang)) s.settings.lang = 'auto';
   if (Array.isArray(d.profiles) && d.profiles.length) {
     s.profiles = d.profiles.filter(p => p && p.id && Array.isArray(p.equip)).map(p => ({id: String(p.id), name: String(p.name || 'Siłownia'), equip: p.equip.filter(e => ALL.includes(e))}));
     if (!s.profiles.length) s.profiles = defaultProfiles();
@@ -83,6 +86,10 @@ export function migrate(d) {
   if (o0(d.settings).dayPick && typeof d.settings.dayPick === 'object') s.settings.dayPick = {stamp: String(d.settings.dayPick.stamp), idx: +d.settings.dayPick.idx || 0};
   if (d.draft && Array.isArray(d.draft.ex)) s.draft = d.draft;
   if (d.today && Array.isArray(d.today.items)) s.today = d.today;
+  // AI coach: provider settings (the key never leaves this phone, it is not in backups) and the last messages.
+  if (d.ai && typeof d.ai === 'object') for (const k of ['provider', 'key', 'model', 'base']) if (typeof d.ai[k] === 'string') s.ai[k] = d.ai[k].slice(0, 400);
+  if (!['anthropic', 'openai', 'gemini', 'custom'].includes(s.ai.provider)) s.ai.provider = 'anthropic';
+  if (Array.isArray(d.chat)) s.chat = d.chat.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string').slice(-40).map(m => ({role: m.role, text: m.text.slice(0, 20000), t: +m.t || 0, ...(m.plan && typeof m.plan === 'object' ? {plan: m.plan} : {}), ...(m.err ? {err: true, detail: String(m.detail || '').slice(0, 300)} : {})}));
   return s;
 }
 

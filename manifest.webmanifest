@@ -1,7 +1,7 @@
 {
-  "name": "Twój Trener",
-  "short_name": "Twój Trener",
-  "description": "Trening generowany z regeneracji mięśni, 50 ćwiczeń z animacją techniki, progresja ciężaru i postępy.",
+  "name": "Mój Trener",
+  "short_name": "Mój Trener",
+  "description": "Plan treningu na masę z ćwiczeniami potwierdzonymi badaniami, rysunki techniki, progresja ciężaru i trener AI.",
   "lang": "pl",
   "start_url": "./",
   "scope": "./",

@@ -1,13 +1,16 @@
-/* Twój Trener: UI. Only exercises with evidence of muscle growth are offered (catalog usable()). Screens: Trening (today / session), Regeneracja, Ćwiczenia, Postępy, Ustawienia, Wiedza. */
-import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, PLANS, CYCLE, KINDN, EQUIPMENT, KINDS, PHOTO_CREDIT, SOURCES, EV_NAME, TRAINABLE, canDo, primary, usable, listable, photoSrc, illSrc, ILL_CREDIT} from './data/catalog.js';
+/* Mój Trener: UI. Only exercises with evidence of muscle growth are offered (catalog usable()). Screens: Trening (today / session), Regeneracja, Ćwiczenia, Postępy, Ustawienia, Wiedza. */
+import {EX, MUSCLES, MUSCLE_INFO, PATTERNS, PLANS, CYCLE, KINDN, EQUIPMENT, KINDS, PHOTO_CREDIT, SOURCES, EV_NAME, TRAINABLE, canDo, primary, usable, listable, photoSrc, illSrc, ILL_CREDIT, VARIANT} from './data/catalog.js';
 import {FC, figSVG, figBounds, visMark} from './figure.js';
 import {recovery, weeklySets, status} from './engine/recovery.js';
 import {generate, alternatives, prescribe, FOCUS, exSeconds} from './engine/generator.js';
 import {suggestLoad, sessionsOf, e1rm, fmt} from './engine/progression.js';
 import {WEEKDAYS, WD_SHORT, PRESETS, fillDay, dayName, weekDays, weekdayOf, nextDay} from './engine/planner.js';
-import {load, save, persist, exportJSON, importData, defaultState} from './store.js';
+import {load, save, persist, exportJSON, importData, defaultState, cleanPlan} from './store.js';
 import {bodyMap, targetMap} from './bodymap.js';
 import {HEADS, headName, headsOf, headWhy, mainHeads, headCoverage, LENS, LEN_NAME, lenOf} from './data/heads.js';
+import {setLang, detectLang, addPairs, isEn, locale, T as tt} from './i18n.js';
+import {EN_DATA} from './i18n/en-data.js';
+import {PROVIDERS, aiReady, ask, buildSystem, parsePlan, stripPlan, md} from './ai.js';
 
 /* ---------- Helpers ---------- */
 const PLATES = [[25, '--p25', 44, 9], [20, '--p20', 44, 8], [15, '--p15', 40, 7], [10, '--p10', 34, 6], [5, '--p5', 26, 5], [2.5, '--p2', 22, 4], [1.25, '--p1', 18, 3]];
@@ -18,7 +21,7 @@ const hms = s => { s = Math.max(0, Math.floor(s)); const hh = Math.floor(s / 360
 const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const clone = o => JSON.parse(JSON.stringify(o));
 const roundTo = (v, s) => Math.round(v / s) * s;
-const dateStr = iso => new Date(iso).toLocaleDateString('pl-PL', {weekday: 'short', day: 'numeric', month: 'short'});
+const dateStr = iso => new Date(iso).toLocaleDateString(locale(), {weekday: 'short', day: 'numeric', month: 'short'});
 const isS = ex => ex.unit === 's';
 const kgTxt = (ex, kg) => (ex.kind === 'bw' ? (kg ? '+' + fmt(kg) + ' kg' : 'masa ciała') : fmt(kg) + ' kg' + (ex.kind === 'db' ? ' na hantel' : ''));
 const unitHead = ex => (ex.kind === 'bw' ? '+kg' : ex.kind === 'db' ? 'kg/hantel' : 'kg');
@@ -39,7 +42,7 @@ const boxes = {}, bigBoxes = {}, tightBoxes = {};
 const bigBox = id => bigBoxes[id] || (bigBoxes[id] = figBounds(EX[id], 'auto'));
 const tightBox = id => tightBoxes[id] || (tightBoxes[id] = figBounds(EX[id], 'auto', true));
 const thumbCache = {};
-const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].ek ? '<img class="ill" src="' + illSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : (EX[id].photo || EX[id].lib) ? '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
+const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].ek ? '<img class="ill" src="' + illSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : photoSrc(EX[id], 1) ? '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
 
 /** "Triceps: głowa długa" for the first primary muscle that has heads. */
 function headLine(ex) {
@@ -50,6 +53,19 @@ function headLine(ex) {
 
 /* ---------- State ---------- */
 const S = load();
+/** Interface language: the setting, or the device language when it is 'auto'. English texts are registered only when needed. */
+function applyLang() {
+  const l = detectLang(S.settings.lang);
+  if (l === 'en' && !applyLang.done) {
+    applyLang.done = true;
+    addPairs(Object.values(EX).map(e => [e.n, e.en]));
+    addPairs(EN_DATA);
+    addPairs(Object.values(VARIANT));
+    for (const e of Object.values(EX)) if (e.cuesPl) addPairs(e.cuesPl.map((c, i) => [c, e.cues[i]]));
+  }
+  setLang(l);
+}
+applyLang();
 const applyTheme = () => { const t = S.settings.theme || 'navy'; if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.setAttribute('content', t === 'light' ? '#F2F2F7' : t === 'navy' ? '#1A1D29' : '#000000'); };
 applyTheme();
 if (!S.settings.cycleStart) S.settings.cycleStart = weekStart().toISOString();
@@ -273,7 +289,7 @@ function ctxUsed(ctx) {
   return [];
 }
 function exSheet() {
-  const sh = UI.sheet; const ex = EX[sh.id]; const f = ex.fig || {}; const tl = timeline(ex.fig); const views = [['ill', 'Ilustracja', ex.ek], ['photo', 'Zdjęcia', ex.photo || ex.lib], ['fig', 'Rysunek z liniami', ex.fig]].filter(v => v[2]); if (!views.some(v => v[0] === sh.view)) sh.view = views[0][0]; const bad = f.bad || []; const bd = AN.mode >= 0 ? bad[AN.mode] : null;
+  const sh = UI.sheet; const ex = EX[sh.id]; const f = ex.fig || {}; const tl = timeline(ex.fig); const views = [['ill', 'Rysunek', ex.ek], ['photo', 'Zdjęcie', photoSrc(ex, 0)]].filter(v => v[2]); if (!views.length) views.push(['fig', 'Rysunek', true]); if (!views.some(v => v[0] === sh.view)) sh.view = views[0][0]; const bad = f.bad || []; const bd = AN.mode >= 0 ? bad[AN.mode] : null;
   const ctx = sh.ctx; const q = ctx && ctx.from === 'session' && S.draft ? S.draft.ex[ctx.i] : null;
   const alts = alternatives(sh.id, ctx ? equip() : EQUIPMENT.map(e => e[0]), ctxUsed(ctx)).filter(a => !S.settings.exclude.includes(a));
   const pat = (PATTERNS.find(p => p[0] === ex.p) || ['', ''])[1];
@@ -281,13 +297,15 @@ function exSheet() {
   let h = '';
   if (sh.tab === 'ruch' && views.length > 1) h += '<div class="seg viewseg n' + views.length + '" role="group" aria-label="Widok">' + views.map(v => '<button data-act="view" data-v="' + v[0] + '" aria-pressed="' + (sh.view === v[0]) + '">' + v[1] + '</button>').join('') + '</div>';
   if (sh.tab === 'ruch' && sh.view === 'ill') {
-    h += '<div class="photos ill' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + illSrc(ex, 0) + '" alt="' + esc(ex.n) + ': rozciągnięcie" class="ph0"><img src="' + illSrc(ex, 1) + '" alt="' + esc(ex.n) + ': spięcie" class="ph1"><span class="phtag ph0">1 · Rozciągnięcie</span><span class="phtag ph1">2 · Spięcie</span></div>';
-    h += '<div class="frames steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><img src="' + illSrc(ex, 0) + '" alt=""><span><i>1</i>Rozciągnięcie</span></button><button data-act="photo-k" data-k="2" aria-pressed="true"><span class="auto" aria-hidden="true">↻</span><span>Na zmianę</span></button><button data-act="photo-k" data-k="1"><img src="' + illSrc(ex, 1) + '" alt=""><span><i>2</i>Spięcie</span></button></div>';
+    h += '<div class="photos ill' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + illSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja 1" class="ph0"><img src="' + illSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja 2" class="ph1"><span class="phtag ph0">Pozycja 1</span><span class="phtag ph1">Pozycja 2</span></div>';
+    h += '<div class="frames steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><img src="' + illSrc(ex, 0) + '" alt=""><span><i>1</i>Pozycja 1</span></button><button data-act="photo-k" data-k="2" aria-pressed="true"><span class="auto" aria-hidden="true">↻</span><span>Na zmianę</span></button><button data-act="photo-k" data-k="1"><img src="' + illSrc(ex, 1) + '" alt=""><span><i>2</i>Pozycja 2</span></button></div>';
+    if (ex.ekv && VARIANT[ex.ekv]) h += '<p class="varnote"><b>Bliski wariant.</b> ' + VARIANT[ex.ekv][0] + '</p>';
     const load = {}; for (const k in ex.m) load[k] = ex.m[k] >= 1 ? 1 : 0.3;
     h += '<div class="ill-mus"><div class="ill-map">' + targetMap(load) + '</div><div class="ill-ml"><div class="sec-t">Pracujące mięśnie</div><div class="row">' + primary(ex).map(k => '<span class="chip m prim"><i class="dot1"></i>' + MUSCLES[k] + '</span>').join('') + Object.keys(ex.m).filter(k => ex.m[k] < 1).map(k => '<span class="chip m"><i class="dot2"></i>' + MUSCLES[k] + '</span>').join('') + '</div></div></div>';
     if (f.sA) h += '<p class="steptxt"><b>' + f.sA[0] + ':</b> ' + f.sA[1] + '</p>';
     if (f.sB) h += '<p class="steptxt"><b>' + f.sB[0] + ':</b> ' + f.sB[1] + '</p>';
-    h += '<p class="muted small">Ilustracje: <a href="' + ILL_CREDIT[1] + '" target="_blank" rel="noopener">' + ILL_CREDIT[0] + '</a>, licencja <a href="' + ILL_CREDIT[3] + '" target="_blank" rel="noopener">' + ILL_CREDIT[2] + '</a> (przycięte i przebarwione). Sprzęt na rysunku może się trochę różnić od opisu.</p>';
+    { const mk = (f.marks || []).filter(m => m.l); if (mk.length) h += '<div class="stack" style="gap:8px"><div class="sec-t">Na co zwracać uwagę</div><ul class="cues">' + mk.map(m => '<li><span>' + m.l + '</span></li>').join('') + '</ul></div>'; }
+    h += '<p class="muted small">Rysunki: <a href="' + ILL_CREDIT[1] + '" target="_blank" rel="noopener">' + ILL_CREDIT[0] + '</a>, licencja <a href="' + ILL_CREDIT[3] + '" target="_blank" rel="noopener">' + ILL_CREDIT[2] + '</a> (przycięte i przebarwione).</p>';
   } else if (sh.tab === 'ruch' && sh.view === 'photo') {
     h += '<div class="photos' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + photoSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja startowa" class="ph0"><img src="' + photoSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja końcowa" class="ph1"><span class="phtag ph0">' + (f.sA || ['Start'])[0] + '</span><span class="phtag ph1">' + (f.sB || ['Koniec'])[0] + '</span></div>';
     h += '<div class="steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><span>1</span>' + (f.sA || ['Start'])[0] + '</button><button data-act="photo-k" data-k="2"><span>↻</span>Na zmianę</button><button data-act="photo-k" data-k="1"><span>2</span>' + (f.sB || ['Koniec'])[0] + '</button></div>';
@@ -316,10 +334,11 @@ function exSheet() {
       if (ms.length) h += '<div class="stack" style="gap:8px"><div class="sec-t">Które części mięśni</div><ul class="heads">' + ms.map(m => '<li><span class="hm">' + MUSCLES[m] + '</span><span class="hh">' + HEADS[m].map(([hk, hn]) => { const w = (byM[m].find(x => x[0] === m + '.' + hk) || [0, 0])[1]; return '<span class="hchip w' + (w >= 1 ? 2 : w > 0 ? 1 : 0) + '">' + hn + '</span>'; }).join('') + '</span></li>').join('') + '</ul><div class="legend small"><span><i class="hl2"></i>główny akcent</span><span><i class="hl1"></i>pomocniczo</span><span><i class="hl0"></i>słabo lub wcale</span></div>' + (headWhy(ex) ? '<p class="whytoday">' + headWhy(ex) + '</p>' : '') + '</div>'; }
     { const L = lenOf(ex); h += '<div class="evi"><span class="lenico ' + L + '" aria-hidden="true"></span><div><b>Pozycja pracy mięśnia: ' + LEN_NAME[L].toLowerCase() + '</b><span class="small muted">' + LENS.find(x => x[0] === L)[2] + '</span></div></div>'; }
     if (!ex.ev) h += '<p class="notice small"><b>Bez badań przyrostu.</b> Nie dobieram go automatycznie, ale możesz dodać je do planu sam.</p>';
+    h += '<button class="btn ghost wide aiask" data-act="ai-ask-ex">' + '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.ai + '</svg> Zapytaj trenera AI o to ćwiczenie</button>';
     if (ex.ev) { const src = SOURCES[ex.ev.s]; h += '<div class="evi"><span class="evb ' + ex.ev.l + '">' + ex.ev.l + '</span><div><b>' + EV_NAME[ex.ev.l] + '</b><a href="' + src[1] + '" target="_blank" rel="noopener">' + src[0] + '</a></div></div>'; }
     h += '<div class="stack" style="gap:8px"><div class="sec-t">Sprzęt</div><p class="small">' + (ex.needs.length ? ex.needs.map(n => EQUIPMENT.find(e => e[0] === n)[1]).join(', ') : 'Bez sprzętu') + '</p></div>';
     if (best) h += '<p class="small">Twój rekord: <b class="mono">' + kgTxt(ex, best) + '</b></p>';
-    h += '<div class="stack" style="gap:8px"><div class="sec-t">Jak wykonać</div>' + (ex.lib ? '<p class="muted small">Opis z bazy free-exercise-db, po angielsku.</p>' : '') + '<ul class="cues">' + ex.cues.map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
+    h += '<div class="stack" style="gap:8px"><div class="sec-t">Jak wykonać</div>' + (ex.lib && !ex.cuesPl && !isEn() ? '<p class="muted small">Opis z bazy free-exercise-db, po angielsku.</p>' : '') + '<ul class="cues"' + (ex.lib && !ex.cuesPl ? ' data-noi18n' : '') + '>' + (!isEn() && ex.cuesPl ? ex.cuesPl : ex.cues).map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
     if (ex.err.length) h += '<div class="stack" style="gap:8px"><div class="sec-t">Częste błędy</div><ul class="cues bad">' + ex.err.map(c => '<li><span>' + c + '</span></li>').join('') + '</ul></div>';
   } else if (sh.tab === 'set') {
     const day = (curPlan() || {days: []}).days[ctx.d]; const e = day && day.ex[ctx.i];
@@ -392,6 +411,7 @@ $('#sheetRoot').addEventListener('click', ev => {
   if (a === 'plan-ex') { const e = curPlan().days[+b.dataset.d].ex[+b.dataset.i]; openSheet(e.id, {from: 'plan', d: +b.dataset.d, i: +b.dataset.i}); return; }
   if (a === 'stab') { UI.sheet.tab = b.dataset.t; renderSheet(true); return; }
   if (a === 'view') { UI.sheet.view = UI.lastView = b.dataset.v; renderSheet(false); return; }
+  if (a === 'ai-ask-ex') { const ex = EX[UI.sheet.id]; closeAll(); UI.fromSettings = false; UI.sub = 'ai'; aiSend(tt('Jak poprawnie wykonać to ćwiczenie i jak je wpleść w mój plan?') + ' ' + (isEn() ? ex.en : ex.n)); return; }
   if (a === 'photo-k') { const p = $('#photos'); if (!p) return; p.classList.remove('show0', 'show1', 'still'); if (b.dataset.k !== '2') p.classList.add('still', 'show' + b.dataset.k); document.querySelectorAll('.steps button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); return; }
   if (a === 'anim-toggle') { AN.paused = !AN.paused; AN.last = 0; b.textContent = AN.paused ? '▶ Odtwórz' : '❚❚ Pauza'; if (!AN.paused) { AN.t = timeForK(timeline(EX[UI.sheet.id].fig), AN.k); kick(); } return; }
   if (a === 'speed') { AN.speed = AN.speed === 1 ? 0.5 : 1; b.textContent = AN.speed === 1 ? '1×' : '0,5×'; return; }
@@ -458,7 +478,7 @@ function addExercise(target, id, day) {
 const curPlan = () => S.customPlans.find(c => c.id === UI.pe);
 function openPlanEditor(id) { UI.pe = id; UI.peOpen = null; UI.peDel = null; UI.sub = 'planedit'; render(); window.scrollTo(0, 0); }
 function planChanged() { S.today = null; persistNow(); render(); if (UI.sheet) renderSheet(false); }
-function subBack() { UI.peWd = null; UI.sub = UI.sub === 'planedit' ? 'settings' : UI.sub === 'know' && UI.fromSettings ? 'settings' : null; UI.peDel = null; render(); window.scrollTo(0, 0); }
+function subBack() { UI.peWd = null; UI.sub = UI.sub === 'planedit' ? 'settings' : (UI.sub === 'know' || UI.sub === 'ai') && UI.fromSettings ? 'settings' : null; UI.aiCfg = false; UI.peDel = null; render(); window.scrollTo(0, 0); }
 function planLoad(days) { const v = {}; days.forEach(d => d.ex.forEach(e => { const m = (EX[e.id] || {}).m || {}; for (const k in m) v[k] = (v[k] || 0) + m[k] * e.sets; })); return v; }
 
 /* ---------- Views ---------- */
@@ -535,6 +555,7 @@ const ICON = {
   recovery: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
   progress: '<path d="M4 19h16M5 15l4-4 4 3 6-7"/>',
   know: '<path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h9"/>',
+  ai: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
 };
 const icon = (k, color) => '<span class="ticon" style="background:' + color + '"><svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[k] + '</svg></span>';
@@ -543,9 +564,9 @@ function viewStart() {
   const ready = TRAINABLE.filter(m => status(rec[m].pct) === 'ready').length;
   const ws = weekStart(); const thisWeek = S.workouts.filter(w => new Date(w.date) >= ws).length;
   const c = weekPlanObj(); const perWeek = c && c.days.length ? c.days.length : 0;
-  const today = new Date().toLocaleDateString('pl-PL', {weekday: 'long', day: 'numeric', month: 'long'});
+  const today = new Date().toLocaleDateString(locale(), {weekday: 'long', day: 'numeric', month: 'long'});
   let h = '<div class="stack"><p class="start-date">' + today.charAt(0).toUpperCase() + today.slice(1) + '</p>';
-  if (!st.welcomed) h += '<section class="card welcome"><b>Witaj w Twoim Trenerze</b><p class="small">Zacznij od planu tygodnia: wybierz dni i partie mięśni, a ćwiczenia dobiorą się same. Proponuję tylko ćwiczenia, przy których badania pokazały przyrost mięśni.</p><div class="row"><button class="btn sm primary" data-act="day-open" data-v="' + weekdayOf() + '">Zaplanuj tydzień</button><button class="btn sm ghost" data-act="welcomed">Później</button></div></section>';
+  if (!st.welcomed) h += '<section class="card welcome"><b>Witaj w Moim Trenerze</b><p class="small">Zacznij od planu tygodnia: wybierz dni i partie mięśni, a ćwiczenia dobiorą się same. Proponuję tylko ćwiczenia, przy których badania pokazały przyrost mięśni.</p><div class="row"><button class="btn sm primary" data-act="day-open" data-v="' + weekdayOf() + '">Zaplanuj tydzień</button><button class="btn sm ghost" data-act="welcomed">Później</button></div></section>';
   if (S.draft) {
     const [dn, dt] = counts(S.draft);
     if (Date.now() - new Date(S.draft.started) > 12 * 3600e3) h += '<section class="card hero"><div class="eyebrow">Niezakończony trening</div><h2>' + esc(S.draft.title || 'Trening') + '</h2><p class="muted">Zaczęty ' + dateStr(S.draft.started) + ', zrobione ' + dn + ' z ' + dt + ' serii. Zapisz go albo porzuć, żeby zacząć dzisiejszy.</p><div class="hero-btns"><button class="btn primary big" data-act="stale-save"' + (dn ? '' : ' disabled') + '>Zapisz</button><button class="btn big" data-act="stale-drop">Porzuć</button></div></section>';
@@ -557,13 +578,13 @@ function viewStart() {
     h += '<section class="card hero"><div class="eyebrow">Dziś</div><h2>' + esc(t.title) + '</h2><p class="muted">' + exWord(t.items.length) + ' · ok. ' + t.estMin + ' min</p><div class="hero-btns"><button class="btn primary big" data-act="start-go"' + (t.items.length ? '' : ' disabled') + '>Zacznij trening</button><button class="btn big" data-act="go" data-tab="train">Podgląd</button></div></section>';
   }
   const tiles = [
-    ['train', 'Trening na dziś', S.draft ? 'w toku' : t.rest ? 'dziś wolne' : exWord(t.items.length), '#007AFF', 'go', 'train'],
     ['plan', 'Plan tygodnia', perWeek ? perWeek + ' ' + daysWord(perWeek) + ' w tygodniu' : 'ustaw dni i partie', '#34C759', 'go', 'plan'],
-    ['atlas', 'Ćwiczenia', Object.keys(EX).length + ', w tym ' + Object.values(EX).filter(usable).length + ' z badaniami', '#FF9500', 'go', 'atlas'],
+    ['atlas', 'Ćwiczenia', Object.values(EX).filter(e => listable(e, true)).length + ', w tym ' + Object.values(EX).filter(usable).length + ' z badaniami', '#FF9500', 'go', 'atlas'],
     ['recovery', 'Regeneracja', 'gotowe ' + ready + ' z ' + TRAINABLE.length + ' partii', '#FF3B30', 'go', 'recovery'],
     ['progress', 'Postępy', thisWeek + ' w tym tygodniu', '#AF52DE', 'go', 'progress'],
     ['know', 'Wiedza', 'zasady i badania', '#5856D6', 'go-know', ''],
   ];
+  tiles.splice(1, 0, ['ai', 'Trener AI', aiReady(S.ai) ? 'zapytaj o plan i technikę' : 'połącz Claude, ChatGPT lub Gemini', '#0A84FF', 'go-ai', '']);
   h += '<div class="tiles">' + tiles.map(([k, l, sub, col, act, tab]) => '<button class="tile" data-act="' + act + '"' + (tab ? ' data-tab="' + tab + '"' : '') + '>' + icon(k, col) + '<b>' + l + '</b><span>' + sub + '</span></button>').join('') + '</div>';
   h += '<ul class="list"><li><button class="lrow" data-act="go-settings">' + icon('settings', '#8E8E93') + '<span class="lmain"><b>Ustawienia</b><span>Siłownie i sprzęt, gotowe plany, cykl, kopia danych</span></span><span class="chev">›</span></button></li></ul>';
   return h + '</div>';
@@ -572,6 +593,7 @@ function viewPlanTab() {
   const c = weekPlanObj();
   let h = '<div class="stack">' + weekList();
   if (c && c.days.length) h += planVolume(c);
+  h += '<ul class="list"><li><button class="lrow" data-act="go-ai" data-q="plan">' + icon('ai', '#0A84FF') + '<span class="lmain"><b>Ułóż plan z trenerem AI</b><span>Opisz cel i dni, a AI przygotuje plan do wgrania</span></span><span class="chev">›</span></button></li></ul>';
   h += '<ul class="list"><li><button class="lrow" data-act="go-settings"><span class="lmain"><b>Gotowe plany i tryb automatyczny</b><span>FBW, góra/dół, PPL albo dobór według regeneracji</span></span><span class="chev">›</span></button></li></ul>';
   return h + '</div>';
 }
@@ -678,7 +700,7 @@ function exSections(list) {
 const chip = (act, v, label, on) => '<button class="pill" data-act="' + act + '" data-v="' + v + '" aria-pressed="' + on + '">' + label + '</button>';
 function viewAtlas() {
   const A = UI.at; const q = UI.aq.trim().toLowerCase();
-  const base = Object.values(EX).filter(e => (!UI.onlyEv || usable(e)) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())));
+  const base = Object.values(EX).filter(e => listable(e, true) && (!UI.onlyEv || usable(e)) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())));
   let h = '<div class="atl-head"><input class="search" id="aq" type="search" placeholder="Szukaj, np. wiosłowanie" value="' + esc(UI.aq) + '" aria-label="Szukaj ćwiczenia"></div><div class="stack">';
   const toggles = '<div class="filters" role="group" aria-label="Opcje">' + '<button class="pill tog" data-act="only-ev" aria-pressed="' + UI.onlyEv + '">' + (UI.onlyEv ? '✓ ' : '') + 'Tylko z badaniami</button><button class="pill tog" data-act="mine" aria-pressed="' + UI.mine + '">' + (UI.mine ? '✓ ' : '') + 'Mój sprzęt</button>' + [['all', 'Każdy sprzęt']].concat(KINDS).map(([k, l]) => chip('ak', k, l, UI.ak === k)).join('') + '</div>';
   if (q) {
@@ -688,7 +710,7 @@ function viewAtlas() {
   const part = PARTS.find(p => p[0] === A.part);
   if (!part) {
     h += '<h2 class="step-t">Wybierz <em>partię</em></h2><div class="parts">' + PARTS.map(([k, l, ms, ph]) => {
-      const all = Object.values(EX).filter(e => primary(e).some(m => ms.includes(m))); const nEv = all.filter(usable).length;
+      const all = Object.values(EX).filter(e => listable(e, true) && primary(e).some(m => ms.includes(m))); const nEv = all.filter(usable).length;
       return '<button class="part" data-act="at-part" data-v="' + k + '"><span class="part-ph">' + (EX[ph] ? (EX[ph].ek ? '<img class="ill" src="' + illSrc(EX[ph], 1) + '" alt="" loading="lazy">' : '<img src="' + photoSrc(EX[ph], 1) + '" alt="" loading="lazy">') : '') + '</span><b>' + l + '</b><span class="pn">' + exWord(all.length) + '</span>' + (nEv ? '<span class="pe">✓ ' + nEv + ' z badaniami</span>' : '<span class="pe muted">bez badań</span>') + '</button>';
     }).join('') + '</div><p class="muted small hint-p"><span class="evok">✓ Badania</span> = badania pokazały przyrost mięśni przy tym ćwiczeniu albo jego bliskim wariancie. Tylko takie ćwiczenia dobieram automatycznie.</p>';
     return h + '</div>';
@@ -745,7 +767,7 @@ function chart(pts, ex) {
   let g = ''; for (let v = lo; v <= hi + 1e-9; v += step) g += '<line x1="' + L + '" x2="' + (Wd - Rp) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" style="stroke:var(--line)" stroke-width="1"/><text x="' + (L - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end" style="fill:var(--muted);font:11px var(--mono)">' + fmt(v) + '</text>';
   const line = pts.map((q, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(q.top).toFixed(1)).join(' ');
   const area = line + ' L' + X(pts.length - 1).toFixed(1) + ' ' + (H - B) + ' L' + L + ' ' + (H - B) + ' Z';
-  const lab = [0, pts.length - 1].map(i => '<text x="' + X(i) + '" y="' + (H - 8) + '" text-anchor="' + (i ? 'end' : 'start') + '" style="fill:var(--muted);font:11px var(--body)">' + new Date(pts[i].d).toLocaleDateString('pl-PL', {day: 'numeric', month: 'short'}) + '</text>').join('');
+  const lab = [0, pts.length - 1].map(i => '<text x="' + X(i) + '" y="' + (H - 8) + '" text-anchor="' + (i ? 'end' : 'start') + '" style="fill:var(--muted);font:11px var(--body)">' + new Date(pts[i].d).toLocaleDateString(locale(), {day: 'numeric', month: 'short'}) + '</text>').join('');
   const dots = pts.map((q, i) => '<circle cx="' + X(i) + '" cy="' + Y(q.top) + '" r="' + (i === pts.length - 1 ? 5 : 3) + '" style="fill:' + (i === pts.length - 1 ? 'var(--accent)' : 'var(--surface)') + ';stroke:var(--accent)" stroke-width="2"/>').join('');
   return '<svg class="chart" viewBox="0 0 ' + Wd + ' ' + H + '" role="img" aria-label="Najcięższa seria na treningu, ' + unitHead(ex) + '">' + g + '<path d="' + area + '" style="fill:var(--accent);opacity:.12"/><path d="' + line + '" style="fill:none;stroke:var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>' + dots + lab + '</svg>';
 }
@@ -761,6 +783,7 @@ function viewSettings() {
     if (cur) h += cur.custom ? '<button class="btn sm" data-act="plan-edit" data-v="' + st.plan + '">Edytuj plan „' + esc(cur.name) + '”</button>' : '<button class="btn sm ghost" data-act="plan-copy" data-v="' + st.plan + '">Skopiuj „' + esc(cur.name) + '” i dopasuj do siebie</button>';
   } else h += '<button class="btn sm" data-act="plan-new">+ Zaplanuj tydzień: dni i partie mięśni</button>';
   h += '</section>';
+  h += '<ul class="list"><li><button class="lrow" data-act="go-ai" data-v="cfg">' + icon('ai', '#0A84FF') + '<span class="lmain"><b>Trener AI</b><span>' + (aiReady(S.ai) ? PROVIDERS[S.ai.provider].name + ' · ' + esc(S.ai.model || PROVIDERS[S.ai.provider].model) : 'Nie połączono. Dotknij, żeby dodać klucz API.') + '</span></span><span class="chev">›</span></button></li></ul>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Siłownie i sprzęt</div><ul class="profiles">' + S.profiles.map(p => {
     const open = UI.editProfile === p.id;
     return '<li class="' + (p.id === st.profile ? 'cur' : '') + '"><div class="prow"><button class="pname" data-act="set-profile" data-v="' + p.id + '"><span class="radio" aria-hidden="true"></span><span><b>' + esc(p.name) + '</b><span class="muted small" style="display:block">' + (p.equip.length ? p.equip.map(e => EQUIPMENT.find(x => x[0] === e)[1]).join(', ') : 'bez sprzętu') + '</span></span></button><button class="btn sm ghost" data-act="edit-profile" data-v="' + p.id + '" aria-expanded="' + open + '">' + (open ? 'Gotowe' : 'Edytuj') + '</button></div>' +
@@ -770,6 +793,7 @@ function viewSettings() {
   h += '<section class="card stack" style="gap:10px"><div class="row" style="justify-content:space-between"><div class="sec-t">Cykl 6 tygodni</div><span class="chip">tydzień ' + (wk + 1) + '</span></div>' + cycleBar(wk) +
     '<div class="cycgrid">' + CYCLE.map((c, i) => '<div' + (i === wk ? ' class="now"' : '') + '><b>T' + (i + 1) + '</b><span>' + (c.deload ? 'lżej' : 'RIR ' + c.rir) + '</span></div>').join('') + '</div>' +
     '<p class="muted small">Wysiłek rośnie z tygodnia na tydzień, co 6. tydzień jest lżejszy.</p><button class="btn sm" data-act="cycle-reset">Zacznij cykl od tego tygodnia</button></section>';
+  h += '<section class="card stack" style="gap:10px"><div class="sec-t" data-noi18n>Język · Language</div><div class="seg" style="grid-template-columns:repeat(3,1fr)" role="group" aria-label="Język">' + [['auto', 'Automatycznie'], ['pl', 'Polski'], ['en', 'English']].map(([k, l]) => '<button data-act="set-lang" data-v="' + k + '" aria-pressed="' + ((st.lang || 'auto') === k) + '"' + (k !== 'auto' ? ' data-noi18n' : '') + '>' + l + '</button>').join('') + '</div><p class="muted small">Język aplikacji. Automatycznie: polski na telefonach po polsku, angielski na pozostałych.</p></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Wygląd</div><div class="seg" style="grid-template-columns:repeat(3,1fr)" role="group" aria-label="Motyw">' + [['navy', 'Granatowy'], ['light', 'Jasny'], ['system', 'Jak telefon']].map(([k, l]) => '<button data-act="set-theme" data-v="' + k + '" aria-pressed="' + ((st.theme || 'navy') === k) + '">' + l + '</button>').join('') + '</div></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Gryf</div><div class="seg" style="grid-template-columns:repeat(3,1fr)">' + [20, 15, 10].map(b => '<button data-act="set-bar" data-v="' + b + '" aria-pressed="' + (st.bar === b) + '">' + b + ' kg</button>').join('') + '</div><p class="muted small">Do kalkulatora talerzy przy ćwiczeniach ze sztangą.</p></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Twoje dane</div><p class="muted small">Treningi zapisują się tylko w tym telefonie (' + S.workouts.length + ' treningów). Zrób kopię, żeby przenieść je na inne urządzenie.</p>' +
@@ -777,7 +801,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Twój Trener · wersja 1.12</p>';
+  h += '<p class="muted small center">Mój Trener · wersja 2.0</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -855,6 +879,94 @@ const SRC = [
   ['Ilustracje ćwiczeń: Everkinetic (CC BY-SA 4.0), przycięte i przebarwione', 'https://github.com/everkinetic/data'],
 ];
 const protein = bw => (bw ? Math.round(bw * 1.6) + '–' + Math.round(bw * 2) + ' g' : '–');
+/* ---------- AI coach ---------- */
+const AI_QUICK = ['Co dziś trenować?', 'Oceń mój ostatni tydzień treningów', 'Ułóż mi plan na 4 dni w tygodniu', 'Jak przełamać stagnację w wyciskaniu?', 'Ile białka i kalorii potrzebuję na masę?'];
+const WD_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function openAI(cfg, draft) {
+  UI.fromSettings = UI.sub === 'settings'; UI.sub = 'ai'; UI.aiForm = {...S.ai}; UI.aiCfg = !!cfg || !aiReady(S.ai);
+  if (draft) UI.aiDraft = tt(draft);
+  render(); window.scrollTo(0, cfg ? 0 : document.body.scrollHeight);
+}
+/** What the coach knows about the user: settings, plan, recovery, weekly sets, recent workouts and the exercise list. */
+function aiData() {
+  const rec = recovery(S.workouts), week = weeklySets(S.workouts), p = plan(), cw = cycleWeek();
+  const nm = id => (EX[id] ? EX[id].en : id);
+  const best = q => { const top = q.sets.reduce((a, x) => ((x.kg || 0) > (a.kg || 0) ? x : a), q.sets[0] || {}); return (top.kg ? fmt(top.kg).replace(',', '.') + ' kg × ' : '') + (top.reps ?? '?'); };
+  const workouts = S.workouts.slice(-10).reverse().map(w => w.date.slice(0, 10) + ' ' + (w.dayName || '') + ': ' + w.ex.map(q => nm(q.id) + ' ' + best(q) + ' (' + q.sets.length + ' sets)').join('; '));
+  const exercises = Object.values(EX).filter(e => listable(e, true)).sort((a, b) => !!usable(b) - !!usable(a)).map(e => e.id + ' | ' + e.n + ' / ' + e.en + ' | ' + primary(e).join(',') + ' | ' + (e.needs.join(',') || 'none') + (usable(e) ? ' ✓' : ''));
+  return {
+    lang: isEn() ? 'en' : 'pl', today: new Date().toISOString().slice(0, 10), bw: S.settings.bw, duration: S.settings.duration, gym: profile().name, equipment: equip(),
+    mode: S.settings.mode === 'plan' ? 'follows the plan below' : 'auto-generated workouts based on recovery',
+    cycle: 'week ' + (cw + 1) + ' of 6, ' + (CYCLE[cw].deload ? 'lighter deload week' : CYCLE[cw].rir + ' reps in reserve'),
+    plan: {name: p.name, days: p.days.map((d, i) => ({label: p.week ? WD_EN[d.wd] : 'Day ' + (i + 1), ex: d.ex.map(e => nm(e.id) + ' ' + e.sets + 'x' + e.lo + '-' + e.hi)}))},
+    recovery: Object.fromEntries(TRAINABLE.map(m => [m, (rec[m] || {pct: 100}).pct])),
+    weekly: Object.fromEntries(TRAINABLE.map(m => [m, (Math.round((week[m] || 0) * 10) / 10) + '/' + MUSCLE_INFO[m].target.join('-')])),
+    workouts, exercises,
+  };
+}
+async function aiSend(text) {
+  text = String(text || '').trim();
+  if (!text || UI.aiBusy) return;
+  if (!aiReady(S.ai)) { UI.aiDraft = text; openAI(true); return; }
+  S.chat.push({role: 'user', text, t: Date.now()}); UI.aiDraft = ''; UI.aiBusy = true; UI.sub = 'ai'; persistNow(); render(); window.scrollTo(0, document.body.scrollHeight);
+  try {
+    const ans = await ask(S.ai, buildSystem(aiData()), S.chat.filter(m => !m.err).slice(-12));
+    const pl = parsePlan(ans, id => !!EX[id] && listable(EX[id], true));
+    S.chat.push({role: 'assistant', text: ans, t: Date.now(), ...(pl ? {plan: pl} : {})});
+  } catch (err) {
+    S.chat.push({role: 'assistant', text: err.message || 'Błąd', detail: err.detail || '', err: true, t: Date.now()});
+  }
+  UI.aiBusy = false; S.chat = S.chat.slice(-40); persistNow();
+  if (UI.sub === 'ai') { render(); const el = document.querySelector('.msg:last-of-type'); if (el) el.scrollIntoView({block: 'start'}); }
+  else toast('Trener AI odpowiedział');
+}
+function aiSave() {
+  const f = UI.aiForm; const n = {provider: f.provider, key: String(f.key || '').trim(), model: String(f.model || '').trim(), base: String(f.base || (f.provider === 'custom' ? PROVIDERS.custom.base : '')).trim()};
+  if (!aiReady(n)) { toast(n.provider === 'custom' ? 'Podaj adres i nazwę modelu' : 'Wklej klucz API'); return; }
+  S.ai = n; UI.aiCfg = false; persistNow(); toast('Połączono z AI'); render();
+  if (UI.aiDraft && !S.chat.length) { const d = UI.aiDraft; aiSend(d); }
+}
+function aiApplyPlan(i) {
+  const m = S.chat[i]; if (!m || !m.plan) return;
+  const pl = parsePlan('```plan\n' + JSON.stringify(m.plan) + '\n```', id => !!EX[id] && listable(EX[id], true));
+  if (!pl) { toast('Ten plan nie pasuje do listy ćwiczeń'); return; }
+  const musOf = ex => [...new Set(ex.flatMap(e => primary(EX[e.id])))].slice(0, 6);
+  const c = cleanPlan({id: 'ai' + Date.now().toString(36), name: pl.name || tt('Plan od AI'), week: true, days: pl.days.map(d => ({wd: d.wd, name: d.name || dayName(musOf(d.ex)), mus: musOf(d.ex), ex: d.ex}))});
+  S.customPlans.push(c); S.settings.plan = c.id; S.settings.mode = 'plan'; S.today = null; persistNow();
+  m.applied = c.id; UI.sub = null; UI.tab = 'plan'; render(); window.scrollTo(0, 0); toast('Plan wgrany: ' + c.name);
+}
+function aiSetup() {
+  const f = UI.aiForm || {...S.ai}; const P = PROVIDERS[f.provider] || PROVIDERS.anthropic;
+  let h = '<section class="card stack aisetup" style="gap:12px"><div class="sec-t">Połącz trenera AI</div><p class="small">Trener AI działa na Twoim własnym kluczu API. Wybierz dostawcę, wklej klucz i gotowe. Opłaty za zapytania nalicza dostawca, zwykle to grosze za rozmowę.</p>';
+  h += '<div class="seg aiprov" role="group" aria-label="Dostawca">' + Object.entries(PROVIDERS).map(([k, v]) => '<button data-act="ai-provider" data-v="' + k + '" aria-pressed="' + (f.provider === k) + '"' + (k === 'custom' ? '' : ' data-noi18n') + '>' + v.name + '</button>').join('') + '</div>';
+  if (f.provider === 'custom') h += '<label class="field"><span>Adres API (zgodny z OpenAI)</span><input id="ai-base" value="' + esc(f.base || PROVIDERS.custom.base) + '" autocomplete="off" spellcheck="false" placeholder="https://openrouter.ai/api/v1"></label><p class="muted small">Np. OpenRouter, Groq, Mistral, Ollama albo LM Studio w sieci domowej.</p>';
+  h += '<label class="field"><span>Klucz API' + (f.provider === 'custom' ? ' (jeśli wymagany)' : '') + '</span><input id="ai-key" type="password" value="' + esc(f.key || '') + '" autocomplete="off" spellcheck="false" placeholder="' + (f.provider === 'anthropic' ? 'sk-ant-…' : f.provider === 'openai' ? 'sk-…' : f.provider === 'gemini' ? 'AIza…' : '') + '"></label>';
+  h += '<label class="field"><span>Model</span><input id="ai-model" value="' + esc(f.model || '') + '" autocomplete="off" spellcheck="false" placeholder="' + esc(P.model || 'np. meta-llama/llama-3.3-70b-instruct') + '"></label>';
+  h += '<p class="small"><a href="' + P.keyUrl + '" target="_blank" rel="noopener">Gdzie wziąć klucz? ›</a></p>';
+  h += '<button class="btn primary big" data-act="ai-save">Zapisz i połącz</button>' + (aiReady(S.ai) ? '<button class="btn ghost wide" data-act="ai-cfg">Anuluj</button>' : '');
+  h += '<p class="muted small">Klucz i rozmowy zostają tylko w tym telefonie i nie trafiają do kopii danych. Z każdym pytaniem do dostawcy wysyłam podsumowanie Twojego planu, ostatnich treningów i regeneracji, żeby rady pasowały do Ciebie.</p></section>';
+  return h;
+}
+function aiBubble(m, i) {
+  if (m.role === 'user') return '<div class="msg me" data-noi18n>' + esc(m.text) + '</div>';
+  if (m.err) return '<div class="msg ai err"><b>' + esc(m.text) + '</b>' + (m.detail ? '<span class="small muted" data-noi18n>' + esc(m.detail) + '</span>' : '') + '<button class="btn sm" data-act="ai-retry">Spróbuj ponownie</button></div>';
+  let h = '<div class="msg ai"><div class="md" data-noi18n>' + md(stripPlan(m.text)) + '</div>';
+  if (m.plan) h += '<div class="aiplan"><div class="eyebrow">Plan od AI</div><b class="aiplan-n" data-noi18n>' + esc(m.plan.name || '') + '</b><ul>' + m.plan.days.map(d => '<li><b>' + WEEKDAYS[d.wd] + '</b><span>' + d.ex.map(e => EX[e.id] ? EX[e.id].n : e.id).join(', ') + '</span></li>').join('') + '</ul>' +
+    (m.applied ? '<p class="small okdot">✓ Wgrany do Twoich planów</p>' : '<button class="btn primary wide" data-act="ai-plan" data-i="' + i + '">Wgraj ten plan</button>') + '</div>';
+  return h + '</div>';
+}
+function viewAI() {
+  let h = '<div class="stack aiview">';
+  if (UI.aiCfg || !aiReady(S.ai)) { h += aiSetup(); if (!aiReady(S.ai)) return h + '</div>'; }
+  if (!S.chat.length) h += '<section class="card aihello">' + icon('ai', '#0A84FF') + '<div><b>Twój trener AI</b><p class="small muted">Zna Twój plan, ostatnie treningi i regenerację. Zapytaj o technikę, plan, stagnację albo dietę. Gdy poprosisz o plan, wgrasz go jednym dotknięciem.</p></div></section>';
+  h += '<div class="chat">' + S.chat.map(aiBubble).join('') + (UI.aiBusy ? '<div class="msg ai busy"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span>Trener myśli…</span></div>' : '') + '</div>';
+  if (!UI.aiBusy) h += '<div class="qchips">' + AI_QUICK.map((q, i) => '<button class="pill" data-act="ai-quick" data-i="' + i + '">' + q + '</button>').join('') + '</div>';
+  h += '<div class="composer"><textarea id="aiIn" rows="2" placeholder="Zapytaj trenera…">' + esc(UI.aiDraft || '') + '</textarea><button class="btn primary" data-act="ai-send"' + (UI.aiBusy ? ' disabled' : '') + '>Wyślij</button></div>';
+  h += '<div class="row aifoot"><button class="linkbtn" data-act="ai-cfg"><span data-noi18n>' + PROVIDERS[S.ai.provider].name + ' · ' + esc(S.ai.model || PROVIDERS[S.ai.provider].model) + '</span> · zmień</button>' + (S.chat.length ? '<button class="linkbtn" data-act="ai-clear">Wyczyść rozmowę</button>' : '') + '</div>';
+  h += '<p class="muted small">AI może się mylić. Przy bólu lub urazie skonsultuj się z fizjoterapeutą albo lekarzem.</p>';
+  return h + '</div>';
+}
+
 function viewKnow() {
   const bw = S.settings.bw || 80;
   const R2 = [['72 h', 'Regeneracja', 'Po treningu mięsień potrzebuje czasu: duże partie ok. 72 h, barki i ramiona ok. 48 h, łydki i brzuch ok. 36 h. Generator wybiera partie, które są już gotowe.'],
@@ -867,14 +979,14 @@ function viewKnow() {
   return '<div class="stack"><section class="card"><ul class="rules">' + R2.map(r => '<li><span class="big mono">' + r[0] + '</span><div><b>' + r[1] + '</b><p>' + r[2] + '</p></div></li>').join('') + '</ul></section>' +
     '<section class="card stack" style="gap:10px"><div class="sec-t">Wzorce ruchowe</div><p class="muted small">Kursy trenerskie uczą układać plan wokół wzorców ruchu. Generator najpierw wybiera ćwiczenia wielostawowe dla każdego wzorca, potem izolacje dla partii, którym brakuje serii.</p><div class="pat">' +
     [['Przysiad', 'przysiad, hack, suwnica'], ['Zawias biodrowy', 'martwy ciąg, RDL, hip thrust'], ['Wykrok', 'wykroki, bułgarski'], ['Pchanie poziome', 'wyciskanie, maszyna, pompki'], ['Pchanie pionowe', 'żołnierskie, hantle, maszyna'], ['Przyciąganie poziome', 'wiosłowania'], ['Przyciąganie pionowe', 'podciąganie, wyciąg'], ['Izolacje', 'barki, ramiona, uda, łydki']].map(([a, b]) => '<div><b>' + a + '</b>' + b + '</div>').join('') + '</div></section>' +
-    '<section class="card stack" style="gap:10px"><div class="sec-t">Tylko ćwiczenia z badaniami przyrostu</div><p class="small">Aplikacja proponuje ' + Object.values(EX).filter(usable).length + ' ćwiczeń. <span class="evb A">A</span> to ćwiczenie samo trenowane w badaniu, które zmierzyło przyrost mięśni. <span class="evb B">B</span> to bliski wariant (ten sam ruch, inny sprzęt) albo program treningowy z tym ćwiczeniem, w którym mięśnie urosły. Wolne ciężary i maszyny dają podobny przyrost. Ukryte zostały ćwiczenia bez takich danych: face pull, odwrotne rozpiętki, pompki na poręczach, uginanie młotkowe, ściąganie prostych rąk, wejścia na skrzynię, deska, spięcia, unoszenie nóg i spacer farmera.</p><ol class="src">' + Object.values(SOURCES).map(x => '<li><a href="' + x[1] + '" target="_blank" rel="noopener">' + x[0] + '</a></li>').join('') + '</ol></section>' +
+    '<section class="card stack" style="gap:10px"><div class="sec-t">Tylko ćwiczenia z badaniami przyrostu</div><p class="small">Aplikacja proponuje ' + Object.values(EX).filter(usable).length + ' ćwiczeń. <span class="evb A">A</span> to ćwiczenie samo trenowane w badaniu, które zmierzyło przyrost mięśni. <span class="evb B">B</span> to bliski wariant (ten sam ruch, inny sprzęt) albo program treningowy z tym ćwiczeniem, w którym mięśnie urosły. Wolne ciężary i maszyny dają podobny przyrost. Ćwiczenia bez takich danych nie są dobierane automatycznie, ale znajdziesz je w atlasie i dodasz do planu sam.</p><ol class="src">' + Object.values(SOURCES).map(x => '<li><a href="' + x[1] + '" target="_blank" rel="noopener">' + x[0] + '</a></li>').join('') + '</ol></section>' +
     '<section class="card stack" style="gap:12px"><div class="sec-t">Dieta i regeneracja</div><p class="small">Trening daje sygnał do wzrostu, ale mięśnie rosną przy nadwyżce ok. 300 kcal i 1,6–2,0 g białka na kg masy ciała. Śpij 7–9 godzin.</p>' +
     '<div class="calc"><div class="field"><label for="bw">Masa ciała, kg</label><input id="bw" inputmode="decimal" value="' + fmt(bw) + '"></div><div><div class="field"><label>Białko dziennie</label></div><div class="out" id="prot">' + protein(bw) + '</div></div></div></section>' +
     '<section class="card stack" style="gap:8px"><div class="sec-t">Źródła</div><ol class="src">' + SRC.map(s => '<li><a href="' + s[1] + '" target="_blank" rel="noopener">' + s[0] + '</a></li>').join('') + '</ol></section></div>';
 }
 
 /* ---------- Shell: app bar, banner, render ---------- */
-const TITLES = {home: 'Twój Trener', train: 'Trening', plan: 'Plan tygodnia', recovery: 'Regeneracja', atlas: 'Ćwiczenia', progress: 'Postępy'};
+const TITLES = {home: 'Mój Trener', train: 'Trening', plan: 'Plan tygodnia', recovery: 'Regeneracja', atlas: 'Ćwiczenia', progress: 'Postępy'};
 const GEAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
 function renderBar() {
   const sess = UI.tab === 'train' && !UI.sub && S.draft; let left, right = '', sub = '';
@@ -884,7 +996,7 @@ function renderBar() {
     right = '<button class="btn sm primary" data-act="finish">Zakończ</button>';
     sub = '<div class="steps-strip" role="group" aria-label="Ćwiczenia w treningu">' + d.ex.map((q, i) => '<button class="dot' + (exDone(q) ? ' done' : '') + (i === cur ? ' cur' : '') + '" data-act="go-ex" data-i="' + i + '" aria-label="' + (i + 1) + '. ' + EX[q.id].n + (exDone(q) ? ', zrobione' : '') + '"' + (i === cur ? ' aria-current="step"' : '') + '>' + (exDone(q) ? '✓' : i + 1) + '</button>').join('') + '</div><div class="progress thin" aria-label="' + c + ' z ' + tt + ' serii"><b style="width:' + (tt ? c / tt * 100 : 0) + '%"></b></div>';
   } else if (UI.sub) {
-    left = '<button class="ab-back" data-act="back" aria-label="Wróć">‹</button><span class="ab-title">' + (UI.sub === 'settings' ? 'Ustawienia' : UI.sub === 'planedit' ? 'Twój plan' : 'Wiedza') + '</span>';
+    left = '<button class="ab-back" data-act="back" aria-label="Wróć">‹</button><span class="ab-title">' + (UI.sub === 'settings' ? 'Ustawienia' : UI.sub === 'planedit' ? 'Twój plan' : UI.sub === 'ai' ? 'Trener AI' : 'Wiedza') + '</span>';
   } else if (UI.tab === 'atlas' && (UI.at.part || UI.aq)) {
     left = '<button class="ab-back" data-act="at-back" aria-label="Wróć">‹</button><span class="ab-title">' + TITLES[UI.tab] + '</span>';
   } else if (UI.tab === 'recovery') {
@@ -906,6 +1018,7 @@ function render() {
   if (UI.sub === 'settings') v = viewSettings();
   else if (UI.sub === 'know') v = viewKnow();
   else if (UI.sub === 'planedit') v = viewPlanEdit();
+  else if (UI.sub === 'ai') v = viewAI();
   else v = UI.tab === 'train' ? (S.draft ? viewSession() : viewHome()) : {home: viewStart, plan: viewPlanTab, recovery: viewRecovery, atlas: viewAtlas, progress: viewProgress}[UI.tab]();
   $('#view').innerHTML = v;
   renderBanner(); tick(); kick();
@@ -969,12 +1082,22 @@ function onAct(ev) {
     case 'pe-del-yes': { const id = UI.pe; S.customPlans = S.customPlans.filter(c => c.id !== id); if (S.settings.plan === id) { S.settings.plan = 'fbw3'; S.settings.next = 0; } S.today = null; UI.peDel = null; UI.sub = 'settings'; persistNow(); render(); toast('Plan usunięty'); break; }
     case 'pe-use': setting('mode', 'plan'); setting('plan', UI.pe); setting('next', 0); S.today = null; render(); toast('Używasz planu: ' + curPlan().name); break;
     case 'set-theme': setting('theme', v); applyTheme(); render(); break;
+    case 'set-lang': setting('lang', v); applyLang(); render(); break;
     case 'set-bar': setting('bar', +v); render(); break;
     case 'shuffle': reshuffle(); render(); toast('Nowy zestaw ćwiczeń'); break;
     case 'today-ex': openSheet(b.dataset.id, {from: 'today', idx: +b.dataset.idx}); break;
     case 'pick-open': openPanel('pick', {target: b.dataset.target, d: +b.dataset.d, q: ''}); break;
     case 'go': UI.tab = b.dataset.tab; UI.sub = null; render(); window.scrollTo(0, 0); break;
     case 'go-know': UI.fromSettings = UI.sub === 'settings'; UI.sub = 'know'; render(); window.scrollTo(0, 0); break;
+    case 'go-ai': openAI(b.dataset.v === 'cfg', b.dataset.q === 'plan' ? 'Ułóż mi plan na 4 dni w tygodniu pod budowę masy, z moim sprzętem.' : ''); break;
+    case 'ai-provider': UI.aiForm.provider = v; render(); break;
+    case 'ai-save': aiSave(); break;
+    case 'ai-cfg': UI.aiCfg = !UI.aiCfg; UI.aiForm = {...S.ai}; render(); window.scrollTo(0, 0); break;
+    case 'ai-send': { const n = $('#aiIn'); aiSend(n ? n.value : UI.aiDraft); break; }
+    case 'ai-quick': aiSend(tt(AI_QUICK[+b.dataset.i])); break;
+    case 'ai-clear': S.chat = []; persistNow(); render(); break;
+    case 'ai-plan': aiApplyPlan(+b.dataset.i); break;
+    case 'ai-retry': { const last = [...S.chat].reverse().find(m => m.role === 'user'); while (S.chat.length && S.chat[S.chat.length - 1].err) S.chat.pop(); if (last) { S.chat.splice(S.chat.lastIndexOf(last), 1); aiSend(last.text); } break; }
     case 'go-settings': UI.sub = 'settings'; render(); window.scrollTo(0, 0); break;
     case 'back': subBack(); break;
     case 'back-train': UI.tab = 'train'; UI.sub = null; render(); window.scrollTo(0, 0); break;
@@ -1045,6 +1168,8 @@ $('#view').addEventListener('input', ev => {
   const t = ev.target;
   if (t.id === 'bw') { const v = num(t.value); if (v && v > 20 && v < 400) { S.settings.bw = v; $('#prot').textContent = protein(v); persistSoon(); } return; }
   if (t.id === 'aq') { UI.aq = t.value; const pos = t.selectionStart; render(); const n = $('#aq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (err) { /* ignore */ } return; }
+  if (t.id === 'aiIn') { UI.aiDraft = t.value; return; }
+  if (t.id === 'ai-key' || t.id === 'ai-model' || t.id === 'ai-base') { UI.aiForm[t.id.slice(3)] = t.value; return; }
   if (t.id === 'pe-name') { const c = curPlan(); if (c) { c.name = t.value.trim() || 'Mój plan'; S.today = null; persistSoon(); } return; }
   if (t.classList.contains('pe-dayname')) { const c = curPlan(); if (c && c.days[+t.dataset.d]) { c.days[+t.dataset.d].name = t.value.trim() || 'Dzień ' + (+t.dataset.d + 1); S.today = null; persistSoon(); } return; }
   if (t.classList.contains('pname-in')) { const p = S.profiles.find(x => x.id === t.dataset.pid); if (p) { p.name = t.value.trim() || 'Siłownia'; persistSoon(); } return; }
