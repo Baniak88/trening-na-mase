@@ -300,9 +300,9 @@ function exSheet() {
   let h = '';
   if (sh.tab === 'ruch' && views.length > 1) h += '<div class="seg viewseg n' + views.length + '" role="group" aria-label="Widok">' + views.map(v => '<button data-act="view" data-v="' + v[0] + '" aria-pressed="' + (sh.view === v[0]) + '">' + v[1] + '</button>').join('') + '</div>';
   if (sh.tab === 'ruch' && sh.view === 'ill') {
-    h += '<div class="photos ill' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + illSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja 1" class="ph0"><img src="' + illSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja 2" class="ph1"><span class="phtag ph0">Pozycja 1</span><span class="phtag ph1">Pozycja 2</span></div>';
+    h += '<div class="photos ill' + (REDUCED ? ' still' : '') + '" id="photos" data-act="photo-auto"><img src="' + illSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja 1" class="ph0"><img src="' + illSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja 2" class="ph1"><span class="phtag ph0">Pozycja 1</span><span class="phtag ph1">Pozycja 2</span></div>';
     h += '<div class="ill-key" aria-hidden="true"><span><i class="k1"></i>mięśnie główne</span><span><i class="k2"></i>pomocnicze</span></div>';
-    h += '<div class="frames steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><img src="' + illSrc(ex, 0) + '" alt=""><span><i>1</i>Pozycja 1</span></button><button data-act="photo-k" data-k="2" aria-pressed="true"><span class="auto" aria-hidden="true">↻</span><span>Na zmianę</span></button><button data-act="photo-k" data-k="1"><img src="' + illSrc(ex, 1) + '" alt=""><span><i>2</i>Pozycja 2</span></button></div>';
+    h += '<div class="frames steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><img src="' + illSrc(ex, 0) + '" alt=""><span><i>1</i>Pozycja 1</span></button><button data-act="photo-k" data-k="1"><img src="' + illSrc(ex, 1) + '" alt=""><span><i>2</i>Pozycja 2</span></button></div>';
     if (ex.ekv && VARIANT[ex.ekv]) h += '<p class="varnote"><b>Bliski wariant.</b> ' + VARIANT[ex.ekv][0] + '</p>';
     const load = {}; for (const k in ex.m) load[k] = ex.m[k] >= 1 ? 1 : 0.3;
     h += '<div class="ill-mus"><div class="ill-map">' + targetMap(load) + '</div><div class="ill-ml"><div class="sec-t">Pracujące mięśnie</div><div class="row">' + primary(ex).map(k => '<span class="chip m prim"><i class="dot1"></i>' + MUSCLES[k] + '</span>').join('') + Object.keys(ex.m).filter(k => ex.m[k] < 1).map(k => '<span class="chip m"><i class="dot2"></i>' + MUSCLES[k] + '</span>').join('') + '</div></div></div>';
@@ -311,8 +311,8 @@ function exSheet() {
     { const mk = (f.marks || []).filter(m => m.l); if (mk.length) h += '<div class="stack" style="gap:8px"><div class="sec-t">Na co zwracać uwagę</div><ul class="cues">' + mk.map(m => '<li><span>' + m.l + '</span></li>').join('') + '</ul></div>'; }
     h += '<p class="muted small">Rysunki: <a href="' + ILL_CREDIT[1] + '" target="_blank" rel="noopener">' + ILL_CREDIT[0] + '</a>, licencja <a href="' + ILL_CREDIT[3] + '" target="_blank" rel="noopener">' + ILL_CREDIT[2] + '</a> (przycięte i przebarwione).</p>';
   } else if (sh.tab === 'ruch' && sh.view === 'photo') {
-    h += '<div class="photos' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + photoSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja startowa" class="ph0"><img src="' + photoSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja końcowa" class="ph1"><span class="phtag ph0">' + (f.sA || ['Start'])[0] + '</span><span class="phtag ph1">' + (f.sB || ['Koniec'])[0] + '</span></div>';
-    h += '<div class="steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><span>1</span>' + (f.sA || ['Start'])[0] + '</button><button data-act="photo-k" data-k="2"><span>↻</span>Na zmianę</button><button data-act="photo-k" data-k="1"><span>2</span>' + (f.sB || ['Koniec'])[0] + '</button></div>';
+    h += '<div class="photos' + (REDUCED ? ' still' : '') + '" id="photos" data-act="photo-auto"><img src="' + photoSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja startowa" class="ph0"><img src="' + photoSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja końcowa" class="ph1"><span class="phtag ph0">' + (f.sA || ['Start'])[0] + '</span><span class="phtag ph1">' + (f.sB || ['Koniec'])[0] + '</span></div>';
+    h += '<div class="steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><span>1</span>' + (f.sA || ['Start'])[0] + '</button><button data-act="photo-k" data-k="1"><span>2</span>' + (f.sB || ['Koniec'])[0] + '</button></div>';
     if (f.sA) h += '<p class="steptxt"><b>' + f.sA[0] + ':</b> ' + f.sA[1] + '</p>';
     if (f.sB) h += '<p class="steptxt"><b>' + f.sB[0] + ':</b> ' + f.sB[1] + '</p>';
     h += '<p class="muted small">Zdjęcia: <a href="' + PHOTO_CREDIT[1] + '" target="_blank" rel="noopener">' + PHOTO_CREDIT[0] + '</a> (domena publiczna). Sprzęt na zdjęciu może się trochę różnić od opisu.</p>';
@@ -416,7 +416,12 @@ $('#sheetRoot').addEventListener('click', ev => {
   if (a === 'stab') { UI.sheet.tab = b.dataset.t; renderSheet(true); return; }
   if (a === 'view') { UI.sheet.view = UI.lastView = b.dataset.v; renderSheet(false); return; }
   if (a === 'ai-ask-ex') { const ex = EX[UI.sheet.id]; closeAll(); UI.fromSettings = false; UI.sub = 'ai'; aiSend(tt('Jak poprawnie wykonać to ćwiczenie i jak je wpleść w mój plan?') + ' ' + (isEn() ? ex.en : ex.n)); return; }
-  if (a === 'photo-k') { const p = $('#photos'); if (!p) return; p.classList.remove('show0', 'show1', 'still'); if (b.dataset.k !== '2') p.classList.add('still', 'show' + b.dataset.k); document.querySelectorAll('.steps button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); return; }
+  if (a === 'photo-k' || a === 'photo-auto') {
+    // Tap a position to hold it; tap it again (or the big picture) to go back to alternating.
+    const p = $('#photos'); if (!p) return; const hold = a === 'photo-k' && b.getAttribute('aria-pressed') !== 'true';
+    p.classList.remove('show0', 'show1', 'still'); if (hold) p.classList.add('still', 'show' + b.dataset.k);
+    document.querySelectorAll('.steps button').forEach(x => x.setAttribute('aria-pressed', String(hold && x === b))); return;
+  }
   if (a === 'anim-toggle') { AN.paused = !AN.paused; AN.last = 0; b.textContent = AN.paused ? '▶ Odtwórz' : '❚❚ Pauza'; if (!AN.paused) { AN.t = timeForK(timeline(EX[UI.sheet.id].fig), AN.k); kick(); } return; }
   if (a === 'speed') { AN.speed = AN.speed === 1 ? 0.5 : 1; b.textContent = AN.speed === 1 ? '1×' : '0,5×'; return; }
   if (a === 'mode') { AN.mode = +b.dataset.m; renderSheet(false); return; }
@@ -805,7 +810,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Mój Trener · wersja 2.1</p>';
+  h += '<p class="muted small center">Mój Trener · wersja 2.2</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {

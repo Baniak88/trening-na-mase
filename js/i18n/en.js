@@ -664,7 +664,7 @@ export const EN={
 "Jak poprawnie wykonać to ćwiczenie i jak je wpleść w mój plan?": "How do I do this exercise properly and how do I fit it into my plan?",
 "mięśnie główne": "main muscles",
 "pomocnicze": "assisting",
-"Mój Trener · wersja 2.1": "My Trainer · version 2.1"
+"Mój Trener · wersja 2.2": "My Trainer · version 2.2"
 };
 export const EN_PATTERNS={
 "{0} w tym tygodniu": "{0} this week",

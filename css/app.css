@@ -835,3 +835,17 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .tile:active,.lrow:active,.btn:active,.part:active,.frames button:active{transform:scale(.97)}
 .pill:active,.seg button:active,.stabs button:active{transform:scale(.95)}
 .list>li{content-visibility:auto;contain-intrinsic-size:auto 72px}
+/* 2.2: clean switch between the two positions (no double image) */
+.frames{grid-template-columns:1fr 1fr}
+.photos img,.inl.photos.ill img{background:var(--ill-bg)}
+.photos:not(.ill) img{background:#111}
+.photos img.ph0{animation:none!important;opacity:1}
+.photos .ph1,.photos.ill .ph1,.photos span.ph1,.photos.ill span.ph1{animation:phsw 5s linear infinite}
+.photos span.ph0,.photos.ill span.ph0{animation:phsw0 5s linear infinite}
+@keyframes phsw{0%,46%{opacity:0}50%,96%{opacity:1}100%{opacity:0}}
+@keyframes phsw0{0%,46%{opacity:1}50%,96%{opacity:0}100%{opacity:1}}
+.photos.still .ph1,.photos.still span.ph0,.photos.still span.ph1{animation:none!important}
+.photos.still .ph1,.photos.still span.ph1{opacity:0}
+.photos.still.show1 .ph1,.photos.still.show1 span.ph1{opacity:1}
+.photos.still.show1 span.ph0{opacity:0}
+.photos[data-act]{cursor:pointer}
