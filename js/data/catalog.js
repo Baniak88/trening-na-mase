@@ -1,7 +1,7 @@
 /* Exercise catalog: 84 exercises (74 with evidence of muscle growth) with technique figures, coaching marks and faults. Ported from the prototype. */
 import {LIB} from './library.js';
 /* ---------- Muscles, exercises, plans ---------- */
-const MUSCLES={chest:'Klatka',back:'Plecy',delts:'Barki',biceps:'Biceps',triceps:'Triceps',quads:'Czworogłowe',hams:'Dwugłowe ud',glutes:'Pośladki',calves:'Łydki',abs:'Brzuch'};
+const MUSCLES={chest:'Klatka',back:'Plecy',delts:'Barki',biceps:'Biceps',triceps:'Triceps',quads:'Czworogłowe',hams:'Dwugłowe ud',glutes:'Pośladki',calves:'Łydki',abs:'Brzuch',forearms:'Przedramiona'};
 const PATTERNS=[['knee','Przysiad i wykrok'],['hinge','Zawias biodrowy'],['hpush','Pchanie poziome'],['vpush','Pchanie pionowe'],['hpull','Przyciąganie poziome'],['vpull','Przyciąganie pionowe'],['iso','Izolacja: ramiona, barki, nogi'],['core','Core i noszenie']];
 /* Pose fields: a=ankle, a2=far ankle, hip, sh, t=torso angle, hand, hand2, ks/es=bend side, ft=foot angle, h=head angle.
    {sh:[dx,dy]} / {hip:[dx,dy]} / {a:[dx,dy]} are offsets from that joint. Angles in degrees, 0 = facing direction, 90 = up. */
@@ -357,7 +357,7 @@ PLANS.ppl5.days[1].ex[4]=x('cablecrunch',3,10,15,60);
 PLANS.ppl5.days[2].ex[2]=x('cablefly',3,12,15,90);
 PLANS.ppl5.days[3].ex[2]=x('machinerow',3,10,12,90);
 PLANS.ppl5.days[3].ex[4]=x('hammer',3,10,15,60);
-const KINDS=[['bar','Sztanga'],['db','Hantle'],['machine','Maszyna'],['cable','Wyciąg'],['bw','Masa ciała'],['kb','Kettlebell'],['band','Guma']];
+const KINDS=[['bar','Sztanga'],['db','Hantle'],['machine','Maszyna'],['cable','Wyciąg'],['bw','Masa ciała'],['kb','Kettlebell'],['band','Guma'],['ball','Piłka'],['other','Inny sprzęt']];
 
 /* ---------- Coaching layer: key positions, numbered marks, common faults (side view) ---------- */
 const SPINE=(n,l,ph)=>({t:'line',a:'hip',b:'sh',o:15,n,l,ph});
@@ -695,7 +695,7 @@ const NEEDS2={inclinebar:['barbell','bench'],smithbench:['machines','bench'],smi
  lpcalf:['machines'],dbcalf:['dumbbells']};
 
 /* ---------- Equipment each exercise needs ---------- */
-export const EQUIPMENT=[['barbell','Sztanga ze stojakiem'],['dumbbells','Hantle'],['bench','Ławka'],['machines','Maszyny'],['cable','Wyciąg'],['pullup','Drążek'],['dip','Poręcze'],['kettlebell','Kettlebell'],['bands','Gumy oporowe']];
+export const EQUIPMENT=[['barbell','Sztanga ze stojakiem'],['dumbbells','Hantle'],['bench','Ławka'],['machines','Maszyny'],['cable','Wyciąg'],['pullup','Drążek'],['dip','Poręcze'],['kettlebell','Kettlebell'],['bands','Gumy oporowe'],['ball','Piłka (fitball, lekarska)'],['other','Inny sprzęt (TRX, sanie, lina)']];
 const NEEDS={squat:['barbell'],goblet:['dumbbells'],bss:['dumbbells','bench'],lunge:['dumbbells'],legext:['machines'],deadlift:['barbell'],rdl:['barbell'],
  hipthrust:['barbell','bench'],legcurl:['machines'],calf:[],bench:['barbell','bench'],dbbench:['dumbbells','bench'],incline:['dumbbells','bench'],pushup:[],dips:['dip'],
  ohp:['barbell'],latraise:['dumbbells'],facepull:['cable'],row:['barbell'],dbrow:['dumbbells','bench'],cablerow:['cable'],pullup:['pullup'],latpull:['cable'],
@@ -710,10 +710,10 @@ export const canDo=(ex,equip)=>ex.needs.every(n=>equip.includes(n));
 /** Compound = multi-joint pattern (not isolation/core). */
 export const isCompound=ex=>!['iso','core'].includes(ex.p);
 export const primary=ex=>Object.keys(ex.m).filter(k=>ex.m[k]>=1);
-export const KINDN={bar:'Sztanga',db:'Hantle',machine:'Maszyna',cable:'Wyciąg',bw:'Masa ciała',kb:'Kettlebell',band:'Guma'};
+export const KINDN={bar:'Sztanga',db:'Hantle',machine:'Maszyna',cable:'Wyciąg',bw:'Masa ciała',kb:'Kettlebell',band:'Guma',ball:'Piłka',other:'Inny sprzęt'};
 /** Muscle size class drives recovery time and weekly set targets. */
 export const MUSCLE_INFO={chest:{h:72,target:[10,20]},back:{h:72,target:[10,20]},quads:{h:72,target:[10,20]},hams:{h:72,target:[10,20]},glutes:{h:72,target:[10,20]},
- delts:{h:48,target:[10,20]},biceps:{h:48,target:[8,16]},triceps:{h:48,target:[8,16]},calves:{h:36,target:[6,16]},abs:{h:36,target:[6,16]}};
+ delts:{h:48,target:[10,20]},biceps:{h:48,target:[8,16]},triceps:{h:48,target:[8,16]},calves:{h:36,target:[6,16]},abs:{h:36,target:[6,16]},forearms:{h:36,target:[0,12]}};
 /* ---------- Evidence of muscle growth ----------
    A = the exercise itself was trained in a study that measured muscle growth.
    B = a close variant (same movement, other equipment) or a training programme with it measured growth;
@@ -778,7 +778,7 @@ export const PHOTO_CREDIT=['free-exercise-db','https://github.com/yuhonas/free-e
 for(const id in EX)EX[id].photo='img/ex/'+id;
 /* ---------- Library: the rest of free-exercise-db, without figures or growth evidence ---------- */
 const RAW='https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
-const LIB_INC={bar:2.5,db:2,machine:5,cable:2.5,bw:2.5,kb:4,band:1};
+const LIB_INC={bar:2.5,db:2,machine:5,cable:2.5,bw:2.5,kb:4,band:1,ball:1,other:2.5};
 for(const o of LIB)EX[o.id]={...o,inc:LIB_INC[o.kind],err:[],alt:[],fig:null,lib:true,ev:null,hidden:true};
 /** Photo i (0 = start, 1 = end) of an exercise. */
 export const photoSrc=(ex,i)=>ex.lib?RAW+ex.img+'/'+i+'.jpg':ex.photo+'-'+i+'.jpg';

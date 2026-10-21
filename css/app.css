@@ -710,3 +710,22 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .evi .small{display:block;margin-top:2px}
 .lrow:disabled{opacity:.4}
 :root[data-theme="navy"] .pill.tog[aria-pressed="true"]{background:var(--ok-soft);color:var(--ok)}
+/* ---- v1.10: photos first, simple evidence badge ---- */
+.evok{display:inline-flex;align-items:center;gap:3px;align-self:flex-start;margin-top:4px;padding:2px 8px;border-radius:999px;background:var(--ok-soft);color:var(--ok);font:600 12px/1.4 var(--body)}
+.okdot{font-style:normal;color:var(--ok)}
+.part{padding:0;overflow:hidden}
+.part-ph{display:block;width:100%;aspect-ratio:4/3;background:#fff;overflow:hidden}
+.part-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.part b{padding:10px 12px 0}
+.part span:last-child{padding:0 12px 12px}
+.thumb{background:#fff}
+.thumb img{object-fit:cover}
+.inl.photos{height:auto;aspect-ratio:4/3;border-radius:14px;background:#fff}
+.today-top{grid-template-columns:1fr}
+.addplus{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;font-size:20px;font-weight:600}
+.sec-h{margin-top:4px}
+.inl-cap{left:auto;right:10px;bottom:10px}
+.inl-cap b{background:rgba(20,22,32,.78);color:#fff;padding:5px 12px;border-radius:999px;font-size:13px}
+.part .pn{font-size:13px;color:var(--muted);padding:0 12px}
+.part .pe{font-size:13px;color:var(--ok);padding:2px 12px 12px}
+.part .pe.muted{color:var(--muted)}

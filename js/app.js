@@ -14,6 +14,7 @@ const PLATES = [[25, '--p25', 44, 9], [20, '--p20', 44, 8], [15, '--p15', 40, 7]
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const num = v => { const q = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(q) ? q : null; };
+const hms = s => { s = Math.max(0, Math.floor(s)); const hh = Math.floor(s / 3600); return hh ? hh + ':' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') : mmss(s); };
 const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const clone = o => JSON.parse(JSON.stringify(o));
 const roundTo = (v, s) => Math.round(v / s) * s;
@@ -38,7 +39,7 @@ const boxes = {}, bigBoxes = {}, tightBoxes = {};
 const bigBox = id => bigBoxes[id] || (bigBoxes[id] = figBounds(EX[id], 'auto'));
 const tightBox = id => tightBoxes[id] || (tightBoxes[id] = figBounds(EX[id], 'auto', true));
 const thumbCache = {};
-const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
+const thumb = id => thumbCache[id] || (thumbCache[id] = (EX[id].photo || EX[id].lib) ? '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
 
 /** "Triceps: głowa długa" for the first primary muscle that has heads. */
 function headLine(ex) {
@@ -52,8 +53,8 @@ const S = load();
 const applyTheme = () => { const t = S.settings.theme || 'navy'; if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.setAttribute('content', t === 'light' ? '#F2F2F7' : t === 'navy' ? '#1A1D29' : '#000000'); };
 applyTheme();
 if (!S.settings.cycleStart) S.settings.cycleStart = weekStart().toISOString();
-const UI = {stack: [], permSwap: false, tab: S.draft ? 'train' : 'home', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
-  aq: '', at: {part: null, m: null, head: null, len: null}, am: 'all', ah: 'all', ak: 'all', all: false, mine: true, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
+const UI = {stack: [], permSwap: false, tab: S.draft && Date.now() - new Date(S.draft.started) < 12 * 3600e3 ? 'train' : 'home', sub: null, fromSettings: false, cur: null, sel: null, chartEx: null, openW: null, delW: null, summary: null, sheet: null,
+  aq: '', at: {part: null, m: null, head: null, len: null}, am: 'all', ah: 'all', ak: 'all', all: true, onlyEv: false, mine: false, peWd: null, peSeed: 1, wuOpen: false, cfgOpen: false, editProfile: null, wipe: false};
 let saveT = null;
 function persistNow() { clearTimeout(saveT); save(S); }
 function persistSoon() { clearTimeout(saveT); saveT = setTimeout(() => save(S), 400); }
@@ -191,7 +192,7 @@ function tick() {
     if (left <= 0) { T.on = false; beep(); $('#rest').classList.add('go'); $('#restLbl').textContent = 'Koniec przerwy'; $('#restTm').textContent = 'Czas na serię'; $('#restPb').style.width = '100%'; T.goT = setTimeout(stopRest, 6000); }
     else { $('#restTm').textContent = mmss(left); $('#restPb').style.width = (100 - left / T.total * 100) + '%'; }
   }
-  if (S.draft) { const el = mmss((Date.now() - new Date(S.draft.started)) / 1000); const c = $('#elapsed'); if (c) c.textContent = el; const bt = $('#bnTime'); if (bt) bt.textContent = el; }
+  if (S.draft) { const sec = (Date.now() - new Date(S.draft.started)) / 1000; const el = sec > 12 * 3600 ? 'od ' + dateStr(S.draft.started) : hms(sec); const c = $('#elapsed'); if (c) c.textContent = el; const bt = $('#bnTime'); if (bt) bt.textContent = el; }
 }
 setInterval(tick, 250);
 $('#restMinus').onclick = () => { T.end -= 15000; tick(); };
@@ -247,7 +248,7 @@ function kick() { if (!AN.raf) AN.raf = requestAnimationFrame(loop); }
 
 /* ---------- Sheets ---------- */
 /* Sheets stack: opening a sheet over another keeps the one below; back returns to it. */
-function openSheet(id, ctx) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {id, ctx: ctx || null, tab: ctx && ctx.from === 'plan' ? 'set' : 'ruch', view: UI.lastView || 'fig'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
+function openSheet(id, ctx) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {id, ctx: ctx || null, tab: ctx && ctx.from === 'plan' ? 'set' : 'ruch', view: UI.lastView || 'photo'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
 function openPanel(type, extra) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {type, ...(extra || {})}; renderSheet(true); }
 function closeSheet() { const prev = UI.stack.pop(); if (prev) { UI.sheet = prev; renderSheet(true); return; } UI.sheet = null; $('#sheetRoot').innerHTML = ''; document.body.classList.remove('lock'); kick(); }
 function closeAll() { UI.stack = []; closeSheet(); }
@@ -276,9 +277,9 @@ function exSheet() {
   const ctx = sh.ctx; const q = ctx && ctx.from === 'session' && S.draft ? S.draft.ex[ctx.i] : null;
   const alts = alternatives(sh.id, ctx ? equip() : EQUIPMENT.map(e => e[0]), ctxUsed(ctx)).filter(a => !S.settings.exclude.includes(a));
   const pat = (PATTERNS.find(p => p[0] === ex.p) || ['', ''])[1];
-  const tabs = '<div class="stabs" role="tablist">' + (ctx && ctx.from === 'plan' ? [['set', 'Ustaw']] : []).concat([['ruch', 'Ruch'], ['info', 'Opis']]).concat(alts.length || ctx ? [['alt', ctx ? 'Zamień' : 'Zamienniki']] : []).map(([k, l]) => '<button role="tab" data-act="stab" data-t="' + k + '" aria-selected="' + (sh.tab === k) + '">' + l + '</button>').join('') + '</div>';
+  const tabs = '<div class="stabs" role="tablist">' + (ctx && ctx.from === 'plan' ? [['set', 'Ustaw']] : []).concat([['ruch', 'Technika'], ['info', 'Opis']]).concat(alts.length || ctx ? [['alt', ctx ? 'Zamień' : 'Zamienniki']] : []).map(([k, l]) => '<button role="tab" data-act="stab" data-t="' + k + '" aria-selected="' + (sh.tab === k) + '">' + l + '</button>').join('') + '</div>';
   let h = '';
-  if (sh.tab === 'ruch' && ex.photo && ex.fig) h += '<div class="seg viewseg" role="group" aria-label="Widok"><button data-act="view" data-v="fig" aria-pressed="' + (sh.view !== 'photo') + '">Rysunek z liniami</button><button data-act="view" data-v="photo" aria-pressed="' + (sh.view === 'photo') + '">Zdjęcia</button></div>';
+  if (sh.tab === 'ruch' && ex.photo && ex.fig) h += '<div class="seg viewseg" role="group" aria-label="Widok"><button data-act="view" data-v="photo" aria-pressed="' + (sh.view === 'photo') + '">Zdjęcia</button><button data-act="view" data-v="fig" aria-pressed="' + (sh.view !== 'photo') + '">Rysunek z liniami</button></div>';
   if (sh.tab === 'ruch' && sh.view === 'photo' && (ex.photo || ex.lib)) {
     h += '<div class="photos' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + photoSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja startowa" class="ph0"><img src="' + photoSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja końcowa" class="ph1"><span class="phtag ph0">' + (f.sA || ['Start'])[0] + '</span><span class="phtag ph1">' + (f.sB || ['Koniec'])[0] + '</span></div>';
     h += '<div class="steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><span>1</span>' + (f.sA || ['Start'])[0] + '</button><button data-act="photo-k" data-k="2"><span>↻</span>Na zmianę</button><button data-act="photo-k" data-k="1"><span>2</span>' + (f.sB || ['Koniec'])[0] + '</button></div>';
@@ -331,7 +332,7 @@ function exSheet() {
   }
   if (ctx && ctx.from === 'today') h += '<div class="sheet-actions"><button class="btn ghost wide" data-act="today-remove">Usuń z dzisiejszego treningu</button><button class="btn ghost wide" data-act="exclude">Nie proponuj tego ćwiczenia</button></div>';
   else if (!ctx && S.settings.exclude.includes(sh.id)) h += '<div class="sheet-actions"><button class="btn wide" data-act="unexclude">Znowu proponuj to ćwiczenie</button></div>';
-  return sheetFrame(ex.n, pat + ' · ' + KINDN[ex.kind], ex.en + (ex.uni ? ' · serie na każdą stronę' : ''), tabs, h);
+  return sheetFrame(ex.n, primary(ex).map(k => MUSCLES[k]).join(', ') + ' · ' + KINDN[ex.kind] + (ex.ev ? ' · <span class="okdot">✓ potwierdzone badaniami</span>' : ''), ex.en + (ex.uni ? ' · serie na każdą stronę' : ''), tabs, h);
 }
 function listSheet() {
   const d = S.draft; if (!d) return sheetFrame('Trening', '', '', '', '');
@@ -354,14 +355,14 @@ function pickSheet() {
   if (replace) sh.d = sh.ctx.d;
   const forPlan = sh.target === 'plan' || (replace && sh.ctx.from === 'plan');
   const used = new Set(replace ? ctxUsed(sh.ctx) : forPlan ? ((curPlan() || {days: []}).days[sh.d] || {ex: []}).ex.map(e => e.id) : sh.target === 'session' ? (S.draft ? S.draft.ex.map(e => e.id) : []) : (S.today ? S.today.items.map(e => e.id) : []));
-  const list = Object.values(EX).filter(ex => listable(ex, sh.all) && (forPlan || canDo(ex, equip())) && !used.has(ex.id) && (!q || (ex.n + ' ' + ex.en + ' ' + Object.keys(ex.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
+  const list = Object.values(EX).filter(ex => listable(ex, sh.all !== false) && (forPlan || canDo(ex, equip())) && !used.has(ex.id) && (!q || (ex.n + ' ' + ex.en + ' ' + Object.keys(ex.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q)));
   // Adding to a weekly plan day: exercises for that day's muscles come first.
   const dm = forPlan ? (((curPlan() || {days: []}).days[sh.d] || {}).mus || []) : [];
   const hits = ex => primary(ex).some(m => dm.includes(m)) ? 1 : 0;
-  if (dm.length) list.sort((x, y) => hits(y) - hits(x));
-  const body = '<div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Zakres"><button data-act="pick-all" data-v="0" aria-pressed="' + !sh.all + '">Z badaniami</button><button data-act="pick-all" data-v="1" aria-pressed="' + !!sh.all + '">Wszystkie</button></div>' +
-    '<input class="search" id="pickQ" type="search" placeholder="Szukaj: nazwa lub partia" value="' + esc(sh.q || '') + '" aria-label="Szukaj ćwiczenia"><ul class="exlist">' +
-    list.map(ex => '<li><button class="exrow" data-act="pick-add" data-id="' + ex.id + '"><span class="thumb">' + thumb(ex.id) + '</span><span style="min-width:0"><span class="nm" style="display:block">' + ex.n + '</span><span class="hn" style="display:block">' + KINDN[ex.kind] + ' · ' + primary(ex).map(m => MUSCLES[m]).join(', ') + '</span></span><span class="tg">+</span></button></li>').join('') + '</ul>' +
+  list.sort((x, y) => (hits(y) - hits(x)) || (exOrder(x) - exOrder(y)));
+  const body = '<div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Zakres"><button data-act="pick-all" data-v="0" aria-pressed="' + (sh.all === false) + '">Z badaniami</button><button data-act="pick-all" data-v="1" aria-pressed="' + (sh.all !== false) + '">Wszystkie</button></div>' +
+    '<input class="search" id="pickQ" type="search" placeholder="Szukaj: nazwa lub partia" value="' + esc(sh.q || '') + '" aria-label="Szukaj ćwiczenia"><ul class="list">' +
+    list.map(ex => '<li><button class="lrow" data-act="pick-add" data-id="' + ex.id + '"><span class="thumb">' + thumb(ex.id) + '</span><span class="lmain"><b>' + ex.n + '</b><span>' + KINDN[ex.kind] + ' · ' + (headLine(ex) || primary(ex).map(m => MUSCLES[m]).join(', ')) + '</span>' + evBadge(ex) + '</span><span class="addplus" aria-hidden="true">+</span></button></li>').join('') + '</ul>' +
     (list.length ? '' : '<p class="muted">Nic nie pasuje. Sprawdź sprzęt w profilu „' + esc(profile().name) + '”.</p>');
   return sheetFrame(replace ? 'Zamień na…' : 'Dodaj ćwiczenie', forPlan ? 'Wszystkie ćwiczenia' : 'Sprzęt: ' + esc(profile().name), forPlan ? 'Ćwiczenia, których nie zrobisz w danej siłowni, zamienią się automatycznie.' : '', '', body);
 }
@@ -539,7 +540,8 @@ function viewStart() {
   if (!st.welcomed) h += '<section class="card welcome"><b>Witaj w Twoim Trenerze</b><p class="small">Zacznij od planu tygodnia: wybierz dni i partie mięśni, a ćwiczenia dobiorą się same. Proponuję tylko ćwiczenia, przy których badania pokazały przyrost mięśni.</p><div class="row"><button class="btn sm primary" data-act="day-open" data-v="' + weekdayOf() + '">Zaplanuj tydzień</button><button class="btn sm ghost" data-act="welcomed">Później</button></div></section>';
   if (S.draft) {
     const [dn, dt] = counts(S.draft);
-    h += '<section class="card hero"><div class="eyebrow">Trening w toku</div><h2>' + esc(S.draft.title || 'Trening') + '</h2><p class="muted">' + dn + ' z ' + dt + ' serii</p><button class="btn primary big" data-act="back-train">Wróć do treningu</button></section>';
+    if (Date.now() - new Date(S.draft.started) > 12 * 3600e3) h += '<section class="card hero"><div class="eyebrow">Niezakończony trening</div><h2>' + esc(S.draft.title || 'Trening') + '</h2><p class="muted">Zaczęty ' + dateStr(S.draft.started) + ', zrobione ' + dn + ' z ' + dt + ' serii. Zapisz go albo porzuć, żeby zacząć dzisiejszy.</p><div class="hero-btns"><button class="btn primary big" data-act="stale-save"' + (dn ? '' : ' disabled') + '>Zapisz</button><button class="btn big" data-act="stale-drop">Porzuć</button></div></section>';
+    else h += '<section class="card hero"><div class="eyebrow">Trening w toku</div><h2>' + esc(S.draft.title || 'Trening') + '</h2><p class="muted">' + dn + ' z ' + dt + ' serii</p><button class="btn primary big" data-act="back-train">Wróć do treningu</button></section>';
   } else if (t.rest) {
     const n = t.next ? plan().days[t.next.idx] : null;
     h += '<section class="card hero"><div class="eyebrow">Dziś</div><h2>Dzień wolny</h2><p class="muted">' + (n ? 'Następny trening: ' + WEEKDAYS[n.wd].toLowerCase() + ', ' + esc(n.name) + '.' : 'Mięśnie rosną, kiedy odpoczywasz.') + '</p><button class="btn big" data-act="go" data-tab="plan">Zobacz plan tygodnia</button></section>';
@@ -549,7 +551,7 @@ function viewStart() {
   const tiles = [
     ['train', 'Trening na dziś', S.draft ? 'w toku' : t.rest ? 'dziś wolne' : exWord(t.items.length), '#007AFF', 'go', 'train'],
     ['plan', 'Plan tygodnia', perWeek ? perWeek + ' ' + daysWord(perWeek) + ' w tygodniu' : 'ustaw dni i partie', '#34C759', 'go', 'plan'],
-    ['atlas', 'Ćwiczenia', Object.values(EX).filter(usable).length + ' z badaniami', '#FF9500', 'go', 'atlas'],
+    ['atlas', 'Ćwiczenia', Object.keys(EX).length + ', w tym ' + Object.values(EX).filter(usable).length + ' z badaniami', '#FF9500', 'go', 'atlas'],
     ['recovery', 'Regeneracja', 'gotowe ' + ready + ' z ' + TRAINABLE.length + ' partii', '#FF3B30', 'go', 'recovery'],
     ['progress', 'Postępy', thisWeek + ' w tym tygodniu', '#AF52DE', 'go', 'progress'],
     ['know', 'Wiedza', 'zasady i badania', '#5856D6', 'go-know', ''],
@@ -584,7 +586,7 @@ function viewHome() {
   const eyebrow = weekPlan ? (t.wd === weekdayOf() ? 'Dziś · ' : 'Wybrany dzień · ') + WEEKDAYS[t.wd] : t.mode === 'plan' ? esc(p.name) : 'Dobrane dla Ciebie';
   h += '<section class="card today"><div class="today-top"><div class="today-txt"><div class="eyebrow">' + eyebrow + '</div>' +
     '<h2>' + esc(t.title) + '</h2><div class="today-meta">' + exWord(t.items.length) + ' · ok. ' + t.estMin + ' min' + (cy.deload ? ' · tydzień lżejszy' : '') + '</div>' + (doneToday ? '<div class="donebadge">✓ Zrobione dziś</div>' : '') + '</div>' +
-    '<div class="today-map">' + targetMap(load) + '</div></div>' +
+    '</div>' +
     (t.light ? '<p class="notice small">Mięśnie jeszcze się regenerują. Proponuję lżejszy trening albo dzień wolny.</p>' : '') +
     (cy.deload ? '<p class="notice small">Tydzień lżejszy: połowa serii, ok. 10% mniej ciężaru.</p>' : '') +
     '<button class="btn ' + (doneToday ? '' : 'primary ') + 'big" data-act="start"' + (t.items.length ? '' : ' disabled') + '>' + (doneToday ? 'Trenuj jeszcze raz' : 'Zacznij trening') + '</button>' +
@@ -621,7 +623,7 @@ function viewSession() {
     (UI.wuOpen ? '<ul><li>3–5 min lekkiego cardio: rower, orbitrek, szybki marsz</li><li>Krążenia ramion i bioder, wymachy nóg po 10</li><li>10 przysiadów i 10 pompek bez obciążenia</li><li>Przed ciężkim ćwiczeniem zrób serie rozgrzewkowe pokazane przy nim</li></ul>' : '') + '</section>';
   h += '<section class="player" id="player"><div class="pl-head"><button class="pl-count" data-act="list" aria-haspopup="dialog">Ćwiczenie ' + (i + 1) + ' z ' + n + ' ▾</button><button class="btn sm ghost" data-act="tech" data-i="' + i + '">Zamień</button></div>' +
     '<h2 class="pl-name">' + ex.n + '</h2><div class="row"><span class="chip">' + q.sets.length + ' × ' + range(ex, q) + '</span><span class="chip">przerwa ' + mmss(q.rest) + '</span><span class="chip m">' + KINDN[ex.kind] + '</span>' + (ex.uni ? '<span class="chip m">na stronę</span>' : '') + '</div>' +
-    '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '">' + (ex.fig ? '<span class="inl" id="inlFig" data-id="' + q.id + '">' + figSVG(q.id, thumbK(ex), FC, tightBox(q.id), {detail: true}) + '</span>' : '<span class="inl photo"><img src="' + photoSrc(ex, 1) + '" alt=""></span>') + '<span class="inl-cap"><span id="inlPhase">Technika</span><b>Technika i błędy ›</b></span></button>' +
+    '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '">' + '<span class="inl photos' + (REDUCED ? ' still' : '') + '"><img class="ph0" src="' + photoSrc(ex, 0) + '" alt=""><img class="ph1" src="' + photoSrc(ex, 1) + '" alt=""></span>' + '<span class="inl-cap"><b>Technika i opis ›</b></span></button>' +
     '<p class="hint' + (q.up ? ' up' : q.dl ? ' dl' : '') + '">' + (q.up ? '<span class="mono">↑</span>' : '') + '<span>' + q.hint + '</span></p>';
   if (ex.kind === 'bar' && !q.dl) { const rp = ramp(q.sets[0].kg); if (rp.length) h += '<div class="ramp"><span class="eyebrow">Rozgrzewka:</span>' + rp.map((r, j) => '<button data-act="wu" data-i="' + i + '" data-j="' + j + '" aria-pressed="' + !!(q.wu || [])[j] + '">' + fmt(r[0]) + '×' + r[1] + '</button>').join('') + '</div>'; }
   h += '<div class="setpills" role="group" aria-label="Serie">' + q.sets.map((x, j) => '<button class="sp' + (x.done ? ' done' : '') + (j === k ? ' sel' : '') + '" data-act="sel" data-i="' + i + '" data-k="' + j + '" aria-label="Seria ' + (j + 1) + (x.done ? ', zrobiona' : '') + '"><small>Seria ' + (j + 1) + '</small><span>' + (x.kg == null ? (x.reps ?? q.lo) + ' powt.' : fmt(x.kg) + '×' + (x.reps ?? '–')) + '</span></button>').join('') +
@@ -653,64 +655,53 @@ function viewRecovery() {
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Serie w ostatnich 7 dniach</div>' + volBars(wk, TRAINABLE) + '<div class="legend"><span><i style="background:var(--accent)"></i>zrobione serie</span><span><i style="background:var(--ok-soft);box-shadow:inset 0 0 0 1px var(--ok)"></i>zalecany zakres</span></div><p class="muted small">Ćwiczenie pomocnicze liczy się jako pół serii. Generator dokłada serie tam, gdzie brakuje ich do zakresu.</p></section>';
   return h + '</div>';
 }
-/* ---------- Exercises: step-by-step atlas (part → muscle → region → muscle length → exercises) ---------- */
-const PARTS = [['glutes', 'Pośladki', ['glutes']], ['legs', 'Nogi', ['quads', 'hams', 'calves']], ['chestsh', 'Klatka i barki', ['chest', 'delts']], ['back', 'Plecy', ['back']], ['arms', 'Ramiona', ['biceps', 'triceps']], ['abs', 'Brzuch', ['abs']]];
-const loadOf = ms => Object.fromEntries(ms.map(m => [m, 1]));
-const stepTitle = (a, b) => '<h2 class="step-t">' + a + ' <em>' + b + '</em></h2>';
-function atlasRows(list) {
-  const order = e => (e.ev ? (e.ev.l === 'A' ? 0 : 1) : 2);
-  return '<ul class="list">' + list.sort((a, b) => order(a) - order(b)).map(e => '<li><button class="lrow' + (S.settings.exclude.includes(e.id) ? ' off' : '') + '" data-act="sheet-open" data-id="' + e.id + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + e.n + '</b><span>' + KINDN[e.kind] + ' · ' + (headLine(e) || primary(e).map(k => MUSCLES[k]).join(', ')) + ' · ' + LEN_NAME[lenOf(e)].toLowerCase() + '</span></span>' + (e.ev ? '<span class="evb ' + e.ev.l + '" title="' + EV_NAME[e.ev.l] + '">' + e.ev.l + '</span>' : '<span class="evb N" title="Bez badań przyrostu">–</span>') + '</button></li>').join('') + '</ul>';
+/* ---------- Exercises: pick a body part, then narrow down with simple filters ---------- */
+const PARTS = [['chestsh', 'Klatka i barki', ['chest', 'delts'], 'bench'], ['back', 'Plecy', ['back'], 'latpull'], ['arms', 'Ramiona', ['biceps', 'triceps'], 'curl'], ['legs', 'Nogi', ['quads', 'hams', 'calves'], 'squat'], ['glutes', 'Pośladki', ['glutes'], 'hipthrust'], ['abs', 'Brzuch', ['abs'], 'cablecrunch'], ['forearms', 'Przedramiona', ['forearms'], 'x_palms_up_barbell_wrist_curl_over_a_bench']];
+const evBadge = e => (e.ev ? '<span class="evok" title="' + EV_NAME[e.ev.l] + '">✓ Badania</span>' : '');
+const exOrder = e => (e.ev ? (e.ev.l === 'A' ? 0 : 1) : 2);
+function exRows(list) {
+  return '<ul class="list">' + list.map(e => '<li><button class="lrow' + (S.settings.exclude.includes(e.id) ? ' off' : '') + '" data-act="sheet-open" data-id="' + e.id + '"><span class="thumb">' + thumb(e.id) + '</span><span class="lmain"><b>' + e.n + '</b><span>' + KINDN[e.kind] + ' · ' + (headLine(e) || primary(e).map(k => MUSCLES[k]).join(', ')) + '</span>' + evBadge(e) + '</span><span class="chev" aria-hidden="true">›</span></button></li>').join('') + '</ul>';
 }
-function atlasFilters() {
-  return '<div class="filters" role="group" aria-label="Sprzęt"><button class="pill tog" data-act="mine" aria-pressed="' + UI.mine + '">' + (UI.mine ? '✓ ' : '') + 'Mój sprzęt</button>' + [['all', 'Każdy sprzęt']].concat(KINDS).map(([k, l]) => '<button class="pill" data-act="ak" data-v="' + k + '" aria-pressed="' + (UI.ak === k) + '">' + l + '</button>').join('') + '</div>';
+function exSections(list) {
+  const ev = list.filter(e => e.ev).sort((a, b) => exOrder(a) - exOrder(b)); const rest = list.filter(e => !e.ev);
+  return (ev.length ? '<div class="sec-h">Potwierdzone badaniami <span class="muted small">' + ev.length + '</span></div>' + exRows(ev) : '') +
+    (rest.length && !UI.onlyEv ? '<div class="sec-h">Pozostałe ćwiczenia <span class="muted small">' + rest.length + '</span></div><p class="muted small hint-p">Bez badań mierzących przyrost mięśni. Możesz je dodać do planu sam.</p>' + exRows(rest) : '');
 }
+const chip = (act, v, label, on) => '<button class="pill" data-act="' + act + '" data-v="' + v + '" aria-pressed="' + on + '">' + label + '</button>';
 function viewAtlas() {
   const A = UI.at; const q = UI.aq.trim().toLowerCase();
-  const pool = Object.values(EX).filter(e => listable(e, UI.all) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())));
-  const nEv = Object.values(EX).filter(usable).length;
-  let h = '<div class="atl-head"><input class="search" id="aq" type="search" placeholder="Szukaj ćwiczenia" value="' + esc(UI.aq) + '" aria-label="Szukaj ćwiczenia">' +
-    '<div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Zakres"><button data-act="aall" data-v="0" aria-pressed="' + !UI.all + '">Z badaniami · ' + nEv + '</button><button data-act="aall" data-v="1" aria-pressed="' + UI.all + '">Wszystkie · ' + Object.keys(EX).length + '</button></div></div><div class="stack">';
+  const base = Object.values(EX).filter(e => (!UI.onlyEv || usable(e)) && (UI.ak === 'all' || e.kind === UI.ak) && (!UI.mine || canDo(e, equip())));
+  let h = '<div class="atl-head"><input class="search" id="aq" type="search" placeholder="Szukaj, np. wiosłowanie" value="' + esc(UI.aq) + '" aria-label="Szukaj ćwiczenia"></div><div class="stack">';
+  const toggles = '<div class="filters" role="group" aria-label="Opcje">' + '<button class="pill tog" data-act="only-ev" aria-pressed="' + UI.onlyEv + '">' + (UI.onlyEv ? '✓ ' : '') + 'Tylko z badaniami</button><button class="pill tog" data-act="mine" aria-pressed="' + UI.mine + '">' + (UI.mine ? '✓ ' : '') + 'Mój sprzęt</button>' + [['all', 'Każdy sprzęt']].concat(KINDS).map(([k, l]) => chip('ak', k, l, UI.ak === k)).join('') + '</div>';
   if (q) {
-    const list = pool.filter(e => (e.n + ' ' + e.en + ' ' + Object.keys(e.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q));
-    return h + stepTitle('Wyniki', 'wyszukiwania') + '<p class="muted small">' + exWord(list.length) + '</p>' + (list.length ? atlasRows(list) : '<p class="muted">Nic nie pasuje.</p>') + '</div>';
+    const list = base.filter(e => (e.n + ' ' + e.en + ' ' + Object.keys(e.m).map(m => MUSCLES[m]).join(' ')).toLowerCase().includes(q));
+    return h + toggles + '<p class="muted small">' + exWord(list.length) + '</p>' + (list.length ? exSections(list) : '<p class="muted">Nic nie pasuje.</p>') + '</div>';
   }
   const part = PARTS.find(p => p[0] === A.part);
-  if (part && part[2].length === 1) A.m = part[2][0];
-  const crumbs = [['part', part ? part[1] : null], ['m', A.m && part && part[2].length > 1 ? MUSCLES[A.m] : null], ['head', A.head ? (A.head === 'all' ? 'cały mięsień' : headName(A.head)) : null], ['len', A.len ? (A.len === 'any' ? 'dowolna pozycja' : LEN_NAME[A.len].toLowerCase()) : null]].filter(c => c[1]);
-  if (crumbs.length) h += '<nav class="crumbs" aria-label="Wybór"><button data-act="at-go" data-v="">Partie</button>' + crumbs.map(([k, l]) => '<span>›</span><button data-act="at-go" data-v="' + k + '">' + esc(l) + '</button>').join('') + '</nav>';
-  const step = (n, of) => '<div class="step-n">Krok ' + n + ' z ' + of + '</div>';
   if (!part) {
-    h += step(1, 5) + stepTitle('Wybierz', 'partię') + '<div class="parts">' + PARTS.map(([k, l, ms]) => { const n = pool.filter(e => primary(e).some(m => ms.includes(m))).length; return '<button class="part" data-act="at-part" data-v="' + k + '"><span class="part-map">' + targetMap(loadOf(ms)) + '</span><b>' + l + '</b><span>' + (n ? exWord(n) : 'tylko w „Wszystkie”') + '</span></button>'; }).join('') + '</div>';
+    h += '<h2 class="step-t">Wybierz <em>partię</em></h2><div class="parts">' + PARTS.map(([k, l, ms, ph]) => {
+      const all = Object.values(EX).filter(e => primary(e).some(m => ms.includes(m))); const nEv = all.filter(usable).length;
+      return '<button class="part" data-act="at-part" data-v="' + k + '"><span class="part-ph">' + (EX[ph] ? '<img src="' + photoSrc(EX[ph], 1) + '" alt="" loading="lazy">' : '') + '</span><b>' + l + '</b><span class="pn">' + exWord(all.length) + '</span>' + (nEv ? '<span class="pe">✓ ' + nEv + ' z badaniami</span>' : '<span class="pe muted">bez badań</span>') + '</button>';
+    }).join('') + '</div><p class="muted small hint-p"><span class="evok">✓ Badania</span> = badania pokazały przyrost mięśni przy tym ćwiczeniu albo jego bliskim wariancie. Tylko takie ćwiczenia dobieram automatycznie.</p>';
     return h + '</div>';
   }
-  if (!A.m) {
-    h += step(2, 5) + stepTitle('Wybierz', 'mięsień') + '<ul class="list">' + part[2].map(m => '<li><button class="lrow" data-act="at-m" data-v="' + m + '"><span class="mini-map">' + targetMap(loadOf([m])) + '</span><span class="lmain"><b>' + MUSCLES[m] + '</b><span>' + exWord(pool.filter(e => primary(e).includes(m)).length) + '</span></span><span class="chev">›</span></button></li>').join('') + '</ul>';
-    return h + '</div>';
+  if (part[2].length === 1) A.m = part[2][0];
+  let list = base.filter(e => primary(e).some(m => part[2].includes(m)));
+  h += '<h2 class="step-t">' + part[1] + '</h2>';
+  if (part[2].length > 1) h += '<div class="filters" role="group" aria-label="Mięsień">' + chip('at-m', '', 'Wszystkie', !A.m) + part[2].map(m => chip('at-m', m, MUSCLES[m], A.m === m)).join('') + '</div>';
+  if (A.m) list = list.filter(e => primary(e).includes(A.m));
+  if (A.m && HEADS[A.m]) {
+    h += '<div class="filters" role="group" aria-label="Część mięśnia">' + chip('at-head', '', 'Cały mięsień', !A.head) + HEADS[A.m].map(([k, l]) => chip('at-head', A.m + '.' + k, l, A.head === A.m + '.' + k)).join('') + '</div>';
+    if (A.head) list = list.filter(e => mainHeads(e, A.m).includes(A.head));
   }
-  const m = A.m; const ofM = pool.filter(e => primary(e).includes(m));
-  if (!HEADS[m]) { A.head = A.head || 'all'; A.len = A.len || 'any'; }
-  if (!A.head) {
-    h += step(3, 5) + stepTitle('Wybierz', 'region mięśnia') + '<ul class="list">' + [['all', 'Cały mięsień', 'wszystkie części']].concat(HEADS[m].map(([k, l]) => [m + '.' + k, l.charAt(0).toUpperCase() + l.slice(1), ''])).map(([k, l]) => { const n = k === 'all' ? ofM.length : ofM.filter(e => mainHeads(e, m).includes(k)).length; return '<li><button class="lrow" data-act="at-head" data-v="' + k + '"' + (n ? '' : ' disabled') + '><span class="lmain"><b>' + l + '</b><span>' + (n ? exWord(n) : 'brak ćwiczeń z badaniami') + '</span></span><span class="chev">›</span></button></li>'; }).join('') + '</ul>';
-    return h + '</div>';
-  }
-  const ofH = A.head === 'all' ? ofM : ofM.filter(e => mainHeads(e, m).includes(A.head));
-  if (!A.len) {
-    h += step(4, 5) + stepTitle('Wybierz', 'pozycję mięśnia') + '<ul class="list">' + LENS.concat([['any', 'Dowolna', 'Wszystkie ćwiczenia na wybrany region.']]).map(([k, l, d]) => { const n = k === 'any' ? ofH.length : ofH.filter(e => lenOf(e) === k).length; return '<li><button class="lrow" data-act="at-len" data-v="' + k + '"' + (n ? '' : ' disabled') + '><span class="lenico ' + k + '" aria-hidden="true"></span><span class="lmain"><b>' + l + '</b><span>' + d + ' ' + (n ? exWord(n) : 'Brak ćwiczeń.') + '</span></span><span class="chev">›</span></button></li>'; }).join('') + '</ul>' +
-      '<p class="muted small hint-p">Ćwiczenia z oporem w pozycji rozciągniętej często dają większy przyrost danego regionu (np. Maeo 2021 i 2023, Kassiano 2025). Najlepiej łączyć różne pozycje.</p>';
-    return h + '</div>';
-  }
-  const list = A.len === 'any' ? ofH : ofH.filter(e => lenOf(e) === A.len);
-  h += step(5, 5) + stepTitle('Ćwiczenia', (A.head === 'all' ? MUSCLES[m] : headName(A.head)) + (A.len === 'any' ? '' : ', ' + LEN_NAME[A.len].toLowerCase())) + atlasFilters() + '<p class="muted small">' + exWord(list.length) + '. <span class="evb A">A</span> badanie przyrostu z tym ćwiczeniem, <span class="evb B">B</span> bliski wariant lub program' + (UI.all ? ', <span class="evb N">–</span> bez badań' : '') + '.</p>' + (list.length ? atlasRows(list) : '<p class="muted">Nic nie pasuje. Zmień sprzęt albo włącz „Wszystkie”.</p>');
+  h += '<div class="filters" role="group" aria-label="Pozycja mięśnia">' + chip('at-len', '', 'Każda pozycja', !A.len) + LENS.map(([k, l]) => chip('at-len', k, l, A.len === k)).join('') + '</div>';
+  if (A.len) list = list.filter(e => lenOf(e) === A.len);
+  h += toggles + '<p class="muted small">' + exWord(list.length) + '</p>' + (list.length ? exSections(list) : '<p class="muted">Nic nie pasuje. <button class="linkbtn" data-act="af-reset">Wyczyść filtry</button></p>');
   return h + '</div>';
 }
-/** One step back in the atlas; returns false when already at the first step. */
 function atlasBack() {
-  const A = UI.at; const part = PARTS.find(p => p[0] === A.part);
   if (UI.aq) { UI.aq = ''; return true; }
-  if (A.len) { A.len = null; if (!HEADS[A.m]) { A.head = null; if (part && part[2].length === 1) { A.part = null; A.m = null; } else A.m = null; } return true; }
-  if (A.head) { A.head = null; if (part && part[2].length === 1) { A.part = null; A.m = null; } return true; }
-  if (A.m && part && part[2].length > 1) { A.m = null; return true; }
-  if (A.part) { A.part = null; A.m = null; return true; }
+  if (UI.at.part) { UI.at = {part: null, m: null, head: null, len: null}; return true; }
   return false;
 }
 function viewProgress() {
@@ -778,7 +769,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Twój Trener · wersja 1.9</p>';
+  h += '<p class="muted small center">Twój Trener · wersja 1.10</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -924,6 +915,8 @@ function onAct(ev) {
   const b = ev.target.closest('[data-act]'); if (!b) return; const a = b.dataset.act; const i = +b.dataset.i; const d = S.draft; const v = b.dataset.v;
   switch (a) {
     case 'start': startWorkout(); break;
+    case 'stale-save': finish(); UI.tab = 'home'; render(); break;
+    case 'stale-drop': discard(); toast('Trening porzucony'); break;
     case 'start-go': UI.tab = 'train'; UI.sub = null; startWorkout(); break;
     case 'welcomed': setting('welcomed', true); render(); break;
     case 'cfg': UI.cfgOpen = !UI.cfgOpen; render(); break;
@@ -1023,10 +1016,10 @@ function onAct(ev) {
     case 'ak': UI.ak = v; render(); break;
     case 'at-back': atlasBack(); render(); window.scrollTo(0, 0); break;
     case 'at-part': UI.at = {part: v, m: null, head: null, len: null}; render(); window.scrollTo(0, 0); break;
-    case 'at-m': UI.at.m = v; UI.at.head = null; UI.at.len = null; render(); window.scrollTo(0, 0); break;
-    case 'at-head': UI.at.head = v; UI.at.len = null; render(); window.scrollTo(0, 0); break;
-    case 'at-len': UI.at.len = v; render(); window.scrollTo(0, 0); break;
-    case 'at-go': { const A = UI.at; if (!v) UI.at = {part: null, m: null, head: null, len: null}; else if (v === 'part') { A.m = (PARTS.find(p => p[0] === A.part) || [0, 0, []])[2].length === 1 ? A.m : null; A.head = null; A.len = null; } else if (v === 'm') { A.head = null; A.len = null; } else if (v === 'head') A.len = null; render(); window.scrollTo(0, 0); break; }
+    case 'at-m': UI.at.m = v || null; UI.at.head = null; render(); break;
+    case 'at-head': UI.at.head = v || null; render(); break;
+    case 'at-len': UI.at.len = v || null; render(); break;
+    case 'only-ev': UI.onlyEv = !UI.onlyEv; render(); break;
     case 'ah': UI.ah = v; render(); break;
     case 'pe-add': addExercise('plan', b.dataset.id, +b.dataset.d); break;
     case 'aall': UI.all = v === '1'; render(); window.scrollTo(0, 0); break;
