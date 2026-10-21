@@ -729,3 +729,10 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 .part .pn{font-size:13px;color:var(--muted);padding:0 12px}
 .part .pe{font-size:13px;color:var(--ok);padding:2px 12px 12px}
 .part .pe.muted{color:var(--muted)}
+/* ---- v1.11: illustrations on a light studio card in every theme ---- */
+.figbox,.inl-wrap{background:linear-gradient(180deg,#F8F9FB,#E8EBF0)!important}
+.figwrap .figbox{border-radius:16px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
+.bodymap .bm-body{fill:var(--body-base)}
+.bodymap .bm-sep{fill:none;stroke:var(--surface);stroke-width:.9;stroke-linecap:round;opacity:.9;pointer-events:none}
+.bodymap .mz{stroke:var(--surface);stroke-width:.8}
+.bodymap .bm-label{font:500 10px var(--body);fill:var(--muted)}
