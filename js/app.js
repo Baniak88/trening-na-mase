@@ -42,7 +42,7 @@ const boxes = {}, bigBoxes = {}, tightBoxes = {};
 const bigBox = id => bigBoxes[id] || (bigBoxes[id] = figBounds(EX[id], 'auto'));
 const tightBox = id => tightBoxes[id] || (tightBoxes[id] = figBounds(EX[id], 'auto', true));
 const thumbCache = {};
-const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].ek ? '<img class="ill" src="' + illSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : photoSrc(EX[id], 1) ? '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
+const thumb = id => thumbCache[id] || (thumbCache[id] = EX[id].ek ? '<img class="ill" src="img/ekt/' + EX[id].ek + '.webp" alt="" loading="lazy" decoding="async">' : photoSrc(EX[id], 1) ? '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">' : EX[id].fig ? figSVG(id, thumbK(EX[id]), FC, boxes[id] || (boxes[id] = figBounds(EX[id], 4 / 3, true)), {}) : '<img src="' + photoSrc(EX[id], 1) + '" alt="" loading="lazy" decoding="async">');
 
 /** "Triceps: głowa długa" for the first primary muscle that has heads. */
 function headLine(ex) {
@@ -266,7 +266,9 @@ function kick() { if (!AN.raf) AN.raf = requestAnimationFrame(loop); }
 /* Sheets stack: opening a sheet over another keeps the one below; back returns to it. */
 function openSheet(id, ctx) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {id, ctx: ctx || null, tab: ctx && ctx.from === 'plan' ? 'set' : 'ruch', view: UI.lastView || 'ill'}; AN.mode = -1; AN.t = 0; AN.k = 0; AN.last = 0; AN.paused = REDUCED; renderSheet(true); }
 function openPanel(type, extra) { if (UI.sheet) UI.stack.push(UI.sheet); UI.sheet = {type, ...(extra || {})}; renderSheet(true); }
-function closeSheet() { const prev = UI.stack.pop(); if (prev) { UI.sheet = prev; renderSheet(true); return; } UI.sheet = null; $('#sheetRoot').innerHTML = ''; document.body.classList.remove('lock'); kick(); }
+function closeSheet() { const prev = UI.stack.pop(); if (prev) { UI.sheet = prev; renderSheet(true); return; } UI.sheet = null;
+  const bg = $('#sheetRoot .sheet-bg');
+  if (bg && !REDUCED) { bg.classList.add('out'); bg.removeAttribute('data-act'); setTimeout(() => { if (!UI.sheet) $('#sheetRoot').innerHTML = ''; }, 200); } else $('#sheetRoot').innerHTML = ''; document.body.classList.remove('lock'); kick(); }
 function closeAll() { UI.stack = []; closeSheet(); }
 function sheetFrame(title, eyebrow, sub, tabs, body) {
   return '<div class="sheet-bg" data-act="sheet-close"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT" data-stop="1"><div class="sheet-top"><div class="grab"></div>' + (UI.stack.length ? '<button class="sheet-back" data-act="sheet-back">‹ Wróć</button>' : '') + '<div class="sheet-h"><div style="min-width:0">' + (eyebrow ? '<div class="eyebrow">' + eyebrow + '</div>' : '') + '<h2 id="shT">' + title + '</h2>' + (sub ? '<div class="muted small">' + sub + '</div>' : '') + '</div><button class="x" data-act="sheet-close" aria-label="Zamknij">×</button></div>' + (tabs || '') + '</div><div class="sheet-body">' + body + '</div></div></div>';
@@ -274,8 +276,9 @@ function sheetFrame(title, eyebrow, sub, tabs, body) {
 function renderSheet(fresh) {
   const sh = UI.sheet; if (!sh) { closeSheet(); return; }
   const h = sh.type === 'list' ? listSheet() : sh.type === 'finish' ? finishSheet() : sh.type === 'pick' ? pickSheet() : sh.type === 'muscle' ? muscleSheet() : sh.type === 'day' ? daySheet() : exSheet();
-  const prev = $('.sheet') ? $('.sheet').scrollTop : 0;
+  const prev = $('.sheet') ? $('.sheet').scrollTop : 0; const opening = !$('#sheetRoot .sheet-bg:not(.out)');
   $('#sheetRoot').innerHTML = h; document.body.classList.add('lock');
+  if (opening) { const bg = $('#sheetRoot .sheet-bg'); if (bg) bg.classList.add('in'); }
   const sx = $('.sheet'); if (sx) sx.scrollTop = fresh ? 0 : prev;
   if (fresh) { const x = $('.sheet .x'); if (x) x.focus({preventScroll: true}); }
   if (sh.id) drawFig(AN.paused ? null : undefined);
@@ -298,6 +301,7 @@ function exSheet() {
   if (sh.tab === 'ruch' && views.length > 1) h += '<div class="seg viewseg n' + views.length + '" role="group" aria-label="Widok">' + views.map(v => '<button data-act="view" data-v="' + v[0] + '" aria-pressed="' + (sh.view === v[0]) + '">' + v[1] + '</button>').join('') + '</div>';
   if (sh.tab === 'ruch' && sh.view === 'ill') {
     h += '<div class="photos ill' + (REDUCED ? ' still' : '') + '" id="photos"><img src="' + illSrc(ex, 0) + '" alt="' + esc(ex.n) + ': pozycja 1" class="ph0"><img src="' + illSrc(ex, 1) + '" alt="' + esc(ex.n) + ': pozycja 2" class="ph1"><span class="phtag ph0">Pozycja 1</span><span class="phtag ph1">Pozycja 2</span></div>';
+    h += '<div class="ill-key" aria-hidden="true"><span><i class="k1"></i>mięśnie główne</span><span><i class="k2"></i>pomocnicze</span></div>';
     h += '<div class="frames steps" role="group" aria-label="Pozycje"><button data-act="photo-k" data-k="0"><img src="' + illSrc(ex, 0) + '" alt=""><span><i>1</i>Pozycja 1</span></button><button data-act="photo-k" data-k="2" aria-pressed="true"><span class="auto" aria-hidden="true">↻</span><span>Na zmianę</span></button><button data-act="photo-k" data-k="1"><img src="' + illSrc(ex, 1) + '" alt=""><span><i>2</i>Pozycja 2</span></button></div>';
     if (ex.ekv && VARIANT[ex.ekv]) h += '<p class="varnote"><b>Bliski wariant.</b> ' + VARIANT[ex.ekv][0] + '</p>';
     const load = {}; for (const k in ex.m) load[k] = ex.m[k] >= 1 ? 1 : 0.3;
@@ -711,7 +715,7 @@ function viewAtlas() {
   if (!part) {
     h += '<h2 class="step-t">Wybierz <em>partię</em></h2><div class="parts">' + PARTS.map(([k, l, ms, ph]) => {
       const all = Object.values(EX).filter(e => listable(e, true) && primary(e).some(m => ms.includes(m))); const nEv = all.filter(usable).length;
-      return '<button class="part" data-act="at-part" data-v="' + k + '"><span class="part-ph">' + (EX[ph] ? (EX[ph].ek ? '<img class="ill" src="' + illSrc(EX[ph], 1) + '" alt="" loading="lazy">' : '<img src="' + photoSrc(EX[ph], 1) + '" alt="" loading="lazy">') : '') + '</span><b>' + l + '</b><span class="pn">' + exWord(all.length) + '</span>' + (nEv ? '<span class="pe">✓ ' + nEv + ' z badaniami</span>' : '<span class="pe muted">bez badań</span>') + '</button>';
+      return '<button class="part" data-act="at-part" data-v="' + k + '"><span class="part-ph">' + (EX[ph] ? (EX[ph].ek ? '<img class="ill" src="' + illSrc(EX[ph], 1) + '" alt="" loading="lazy" decoding="async">' : '<img src="' + photoSrc(EX[ph], 1) + '" alt="" loading="lazy">') : '') + '</span><b>' + l + '</b><span class="pn">' + exWord(all.length) + '</span>' + (nEv ? '<span class="pe">✓ ' + nEv + ' z badaniami</span>' : '<span class="pe muted">bez badań</span>') + '</button>';
     }).join('') + '</div><p class="muted small hint-p"><span class="evok">✓ Badania</span> = badania pokazały przyrost mięśni przy tym ćwiczeniu albo jego bliskim wariancie. Tylko takie ćwiczenia dobieram automatycznie.</p>';
     return h + '</div>';
   }
@@ -801,7 +805,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Mój Trener · wersja 2.0</p>';
+  h += '<p class="muted small center">Mój Trener · wersja 2.1</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -1020,7 +1024,10 @@ function render() {
   else if (UI.sub === 'planedit') v = viewPlanEdit();
   else if (UI.sub === 'ai') v = viewAI();
   else v = UI.tab === 'train' ? (S.draft ? viewSession() : viewHome()) : {home: viewStart, plan: viewPlanTab, recovery: viewRecovery, atlas: viewAtlas, progress: viewProgress}[UI.tab]();
-  $('#view').innerHTML = v;
+  const key = UI.tab + '|' + (UI.sub || '') + '|' + (UI.tab === 'atlas' ? (UI.at.part || '') : '') + '|' + (S.draft ? 1 : 0);
+  const vw = $('#view'); vw.innerHTML = v;
+  if (render.key !== key && !REDUCED) { vw.classList.remove('fade'); void vw.offsetWidth; vw.classList.add('fade'); }
+  render.key = key;
   renderBanner(); tick(); kick();
 }
 

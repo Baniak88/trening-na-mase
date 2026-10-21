@@ -661,7 +661,10 @@ export const EN={
 "Dostawca AI nie odpowiedział na czas. Spróbuj jeszcze raz.": "The AI provider didn't respond in time. Try again.",
 "Brak połączenia z dostawcą AI. Sprawdź internet.": "Can't reach the AI provider. Check your internet connection.",
 "Dostawca AI zwrócił pustą odpowiedź.": "The AI provider returned an empty answer.",
-"Jak poprawnie wykonać to ćwiczenie i jak je wpleść w mój plan?": "How do I do this exercise properly and how do I fit it into my plan?"
+"Jak poprawnie wykonać to ćwiczenie i jak je wpleść w mój plan?": "How do I do this exercise properly and how do I fit it into my plan?",
+"mięśnie główne": "main muscles",
+"pomocnicze": "assisting",
+"Mój Trener · wersja 2.1": "My Trainer · version 2.1"
 };
 export const EN_PATTERNS={
 "{0} w tym tygodniu": "{0} this week",

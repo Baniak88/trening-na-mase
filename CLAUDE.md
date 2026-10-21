@@ -23,7 +23,7 @@ PWA bez kroku budowania: czysty HTML, CSS i moduły ES, hostowane na GitHub Page
 Ćwiczenie w `js/data/catalog.js` potrzebuje: nazwy, wzorca (`p`), rodzaju sprzętu (`kind`), mięśni (`m`: 1 = główny, 0,5 = pomocniczy),
 wskazówek, błędów, zamienników, rysunku (`fig`: pozy A i B, sprzęt), opisu faz i linii kontrolnych (`ANN`), wpisu w `NEEDS`
 oraz dowodu przyrostu w `EVID` (poziom A/B i klucz z `SOURCES`). Bez wpisu w `EVID` ćwiczenie jest ukryte.
-Rysunki: `img/ek/<rysunek>-0.svg` i `-1.svg` z Everkinetic (CC BY-SA 4.0, przycięte), przypisanie w `ART` w `js/data/art.js` (`[rysunek, klucz]` = bliski wariant z opisem w `VARIANT`). Ćwiczenie bez rysunku nie jest pokazywane na listach.
+Rysunki: `img/ek/<rysunek>-0.svg` i `-1.svg` z Everkinetic (CC BY-SA 4.0, przycięte, pokolorowane: mięśnie główne pomarańczowe, pomocnicze jasne; narzędzia w `tools/art/`), miniatury `img/ekt/<rysunek>.webp`, przypisanie w `ART` w `js/data/art.js` (`[rysunek, klucz]` = bliski wariant z opisem w `VARIANT`). Ćwiczenie bez rysunku nie jest pokazywane na listach.
 Głowy mięśni (`HEADS`) i ich akcent z opisem: `CURATED` w `js/data/heads.js`; reszta z reguł po angielskiej nazwie.
 
 ## Plan tygodnia
