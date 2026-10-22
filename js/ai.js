@@ -2,7 +2,7 @@
  * Requests go straight from the phone to the provider; the key and the chat stay in localStorage on this device. */
 
 export const PROVIDERS = {
-  anthropic: {name: 'Claude (Anthropic)', model: 'claude-sonnet-5-5', keyUrl: 'https://console.anthropic.com/settings/keys'},
+  anthropic: {name: 'Anthropic', model: 'claude-sonnet-5-5', keyUrl: 'https://console.anthropic.com/settings/keys'},
   openai: {name: 'ChatGPT (OpenAI)', model: 'gpt-5-mini', keyUrl: 'https://platform.openai.com/api-keys'},
   gemini: {name: 'Gemini (Google)', model: 'gemini-2.5-flash', keyUrl: 'https://aistudio.google.com/apikey'},
   custom: {name: 'Zgodny z OpenAI', model: '', keyUrl: 'https://openrouter.ai/keys', base: 'https://openrouter.ai/api/v1'},

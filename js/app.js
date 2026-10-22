@@ -613,7 +613,7 @@ function viewStart() {
     ['progress', 'Postępy', thisWeek + ' w tym tygodniu', '#AF52DE', 'go', 'progress'],
     ['know', 'Wiedza', 'zasady i badania', '#5856D6', 'go-know', ''],
   ];
-  tiles.splice(1, 0, ['ai', 'Trener AI', aiReady(S.ai) ? 'zapytaj o plan i technikę' : 'połącz Claude, ChatGPT lub Gemini', '#0A84FF', 'go-ai', '']);
+  tiles.splice(1, 0, ['ai', 'Trener AI', aiReady(S.ai) ? 'zapytaj o plan i technikę' : 'podłącz własny klucz AI', '#0A84FF', 'go-ai', '']);
   h += '<div class="tiles">' + tiles.map(([k, l, sub, col, act, tab]) => '<button class="tile" data-act="' + act + '"' + (tab ? ' data-tab="' + tab + '"' : '') + '>' + icon(k, col) + '<b>' + l + '</b><span>' + sub + '</span></button>').join('') + '</div>';
   h += '<ul class="list"><li><button class="lrow" data-act="go-settings">' + icon('settings', '#8E8E93') + '<span class="lmain"><b>Ustawienia</b><span>Siłownie i sprzęt, gotowe plany, cykl, kopia danych</span></span><span class="chev">›</span></button></li></ul>';
   return h + '</div>';
@@ -830,7 +830,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Mój Trener · wersja 2.6</p>';
+  h += '<p class="muted small center">Mój Trener · wersja 2.7</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -840,10 +840,10 @@ function peStepper(label, f, val, di, i, rest) {
 function peExList(d, di) {
   return '<ol class="pe-list">' + d.ex.map((e, i) => {
     const ex = EX[e.id]; const open = UI.peOpen === di + '-' + i;
-    return '<li class="pe-ex' + (open ? ' open' : '') + '"><div class="pe-row"><button class="thumb" data-act="sheet-open" data-id="' + e.id + '" aria-label="Technika: ' + ex.n + '">' + thumb(e.id) + '</button>' +
+    return '<li class="pe-ex' + (open ? ' open' : '') + '"><div class="pe-row"><button class="thumb" data-act="pe-swap" data-t="ruch" data-d="' + di + '" data-i="' + i + '" aria-label="Technika: ' + ex.n + '">' + thumb(e.id) + '</button>' +
       '<button class="pe-main" data-act="pe-open" data-d="' + di + '" data-i="' + i + '" aria-expanded="' + open + '"><b>' + ex.n + '</b><span class="mono">' + e.sets + ' × ' + range(ex, e) + ' · przerwa ' + mmss(e.rest) + '</span></button>' +
       '<div class="pe-ord"><button data-act="pe-move" data-d="' + di + '" data-i="' + i + '" data-dir="-1" aria-label="Przesuń wyżej"' + (i === 0 ? ' disabled' : '') + '>▲</button><button data-act="pe-move" data-d="' + di + '" data-i="' + i + '" data-dir="1" aria-label="Przesuń niżej"' + (i === d.ex.length - 1 ? ' disabled' : '') + '>▼</button></div></div>' +
-      (open ? '<div class="pe-edit">' + peStepper('Serie', 'sets', e.sets, di, i) + peStepper(isS(ex) ? 'Od, s' : 'Powt. od', 'lo', e.lo, di, i) + peStepper(isS(ex) ? 'Do, s' : 'Powt. do', 'hi', e.hi, di, i) + peStepper('Przerwa', 'rest', e.rest, di, i, true) + '<button class="linkbtn danger-link" data-act="pe-ex-del" data-d="' + di + '" data-i="' + i + '">Usuń z planu</button></div>' : '') + '</li>';
+      (open ? '<div class="pe-edit">' + peStepper('Serie', 'sets', e.sets, di, i) + peStepper(isS(ex) ? 'Od, s' : 'Powt. od', 'lo', e.lo, di, i) + peStepper(isS(ex) ? 'Do, s' : 'Powt. do', 'hi', e.hi, di, i) + peStepper('Przerwa', 'rest', e.rest, di, i, true) + '<div class="pe-acts"><button class="btn sm primary" data-act="pe-swap" data-t="alt" data-d="' + di + '" data-i="' + i + '">↻ Zamień ćwiczenie</button><button class="btn sm ghost" data-act="pe-swap" data-t="ruch" data-d="' + di + '" data-i="' + i + '">Technika</button><button class="linkbtn danger-link" data-act="pe-ex-del" data-d="' + di + '" data-i="' + i + '">Usuń z planu</button></div></div>' : '') + '</li>';
   }).join('') + '</ol>';
 }
 function planVolume(c) {
@@ -1097,6 +1097,7 @@ function onAct(ev) {
     case 'pe-preset': { const c = curPlan(); const pr = PRESETS.find(x => x.id === v); if (!pr) break; c.days = weekDays(pr.days, {equipment: equip(), exclude: S.settings.exclude}); UI.peWd = null; planChanged(); toast('Gotowe. Zmień dowolny dzień.'); break; }
     case 'plan-copy': { const src = allPlans()[v]; const c = {id: 'c' + Date.now().toString(36), name: (src.name + ' (moja wersja)').slice(0, 30), days: clone(src.days).map(d => ({name: d.name, ex: d.ex.map(e => ({id: e.id, sets: e.sets, lo: e.lo, hi: e.hi, rest: e.rest}))}))}; S.customPlans.push(c); persistNow(); openPlanEditor(c.id); toast('Skopiowano, możesz edytować'); break; }
     case 'plan-edit': openPlanEditor(v); break;
+    case 'pe-swap': { const d = +b.dataset.d; const e = curPlan().days[d].ex[i]; openSheet(e.id, {from: 'plan', d, i}); UI.sheet.tab = b.dataset.t || 'alt'; renderSheet(false); break; }
     case 'pe-open': { const k = b.dataset.d + '-' + i; UI.peOpen = UI.peOpen === k ? null : k; render(); break; }
     case 'pe-move': { const day = curPlan().days[+b.dataset.d]; const j = i + +b.dataset.dir; if (j < 0 || j >= day.ex.length) break; if (UI.sheet && UI.sheet.ctx && UI.sheet.ctx.from === 'plan') UI.sheet.ctx.i = j; [day.ex[i], day.ex[j]] = [day.ex[j], day.ex[i]]; if (UI.peOpen === b.dataset.d + '-' + i) UI.peOpen = b.dataset.d + '-' + j; planChanged(); break; }
     case 'pe-step': { const e = curPlan().days[+b.dataset.d].ex[i]; const ex = EX[e.id]; const dir = +b.dataset.dir; const f = b.dataset.f;
@@ -1114,7 +1115,7 @@ function onAct(ev) {
     case 'pe-del-yes': { const id = UI.pe; S.customPlans = S.customPlans.filter(c => c.id !== id); if (S.settings.plan === id) { S.settings.plan = 'fbw3'; S.settings.next = 0; } S.today = null; UI.peDel = null; UI.sub = 'settings'; persistNow(); render(); toast('Plan usunięty'); break; }
     case 'pe-use': setting('mode', 'plan'); setting('plan', UI.pe); setting('next', 0); S.today = null; render(); toast('Używasz planu: ' + curPlan().name); break;
     case 'set-theme': setting('theme', v); applyTheme(); render(); break;
-    case 'set-lang': setting('lang', v); applyLang(); render(); break;
+    case 'set-lang': { const was = isEn(); setting('lang', v); if ((detectLang(v) === 'en') !== was) { persistNow(); location.reload(); return; } applyLang(); render(); break; }
     case 'set-bar': setting('bar', +v); render(); break;
     case 'shuffle': reshuffle(); render(); toast('Nowy zestaw ćwiczeń'); break;
     case 'today-ex': openSheet(b.dataset.id, {from: 'today', idx: +b.dataset.idx}); break;

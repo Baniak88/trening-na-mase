@@ -10,7 +10,7 @@ Aplikacja na telefon do treningu siłowego na masę mięśniową. Trening na ka�
 
 - **Ekran startowy z menu:** dzisiejszy trening z przyciskiem startu i kafle: Plan tygodnia, Trener AI, Ćwiczenia, Regeneracja, Postępy, Wiedza, Ustawienia. Dolny pasek: Start, Trening, Plan, Ćwiczenia, Postępy.
 
-- **Trener AI:** czat z trenerem, który zna Twój plan, ostatnie treningi i regenerację. Działa na Twoim kluczu API: Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google) albo dowolny serwer zgodny z OpenAI (OpenRouter, Ollama, LM Studio). Poproś o plan, a wgrasz go jednym dotknięciem. Klucz i rozmowy zostają w telefonie i nie trafiają do kopii danych.
+- **Trener AI:** czat z trenerem, który zna Twój plan, ostatnie treningi i regenerację. Działa na Twoim kluczu API: Anthropic, OpenAI, Google albo dowolny serwer zgodny z OpenAI (OpenRouter, Ollama, LM Studio). Poproś o plan, a wgrasz go jednym dotknięciem. Klucz i rozmowy zostają w telefonie i nie trafiają do kopii danych.
 - **Polski i angielski:** język dopasowuje się do języka telefonu (polski na telefonach po polsku, angielski na pozostałych); można go zmienić w Ustawieniach.
 - **Plan tygodnia na ekranie głównym.** Dotykasz dnia i zaznaczasz partie mięśni, np. poniedziałek: klatka + biceps, środa: barki + triceps. Ćwiczenia dobierają się same (możesz je zmienić), a ekran główny pokazuje trening na dzisiejszy dzień tygodnia. W dni wolne widać, kiedy jest następny trening.
 - **Tylko ćwiczenia z badaniami przyrostu.** 74 ćwiczenia (od 4 na łydki do kilkunastu na każdą dużą partię): A = ćwiczenie trenowane w badaniu, które zmierzyło przyrost mięśni; B = bliski wariant albo program z tym ćwiczeniem. Źródło widać przy każdym ćwiczeniu. Ćwiczenia bez takich danych (np. face pull, deska, spacer farmera) są ukryte.

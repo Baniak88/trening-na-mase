@@ -868,3 +868,6 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 #sessBanner .bn-go::after{content:"";display:inline-block;width:6px;height:6px;margin-left:7px;border-right:2px solid currentColor;border-top:2px solid currentColor;transform:translateY(-1px) rotate(45deg)}
 #sessBanner .bn-bar{position:absolute;left:0;bottom:0;height:3px;background:rgba(255,255,255,.75);border-radius:0 2px 2px 0}
 @media (prefers-reduced-motion:reduce){#sessBanner .bn-dot{animation:none}}
+/* 2.7: plan editor actions */
+.pe-acts{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px}
+.pe-acts .danger-link{margin-left:auto}
