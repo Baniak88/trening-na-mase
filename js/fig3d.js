@@ -2,6 +2,8 @@
  * with muscle groups coloured by how much they work. One WebGL renderer is shared and moved between containers.
  * Pose data lives in js/data/poses3d.js. */
 import * as THREE from './vendor/three.module.min.js';
+import {RoundedBoxGeometry} from './vendor/RoundedBoxGeometry.js';
+import {RoomEnvironment} from './vendor/RoomEnvironment.js';
 
 const D = Math.PI / 180;
 /* Segment lengths (m): upper arm, forearm to wrist, wrist to grip centre; thigh, shin. */
@@ -94,65 +96,127 @@ export function buildFigure() {
   return {root: J.root, J, mesh, trunk};
 }
 
-/* ---------- Equipment ---------- */
+/* ---------- Equipment ----------
+ * Gym kit built from rounded boxes, tubes and lathe profiles with shared PBR materials (lit by the studio environment). */
+const MT = {};
+function mats() {
+  if (MT.pad) return MT;
+  MT.pad = new THREE.MeshPhysicalMaterial({color: 0x262C3B, roughness: 0.58, metalness: 0, sheen: 0.6, sheenRoughness: 0.5, sheenColor: new THREE.Color(0x5B6A8A), clearcoat: 0.15, clearcoatRoughness: 0.6});
+  MT.steel = new THREE.MeshStandardMaterial({color: 0x454D5E, roughness: 0.34, metalness: 0.75});
+  MT.chrome = new THREE.MeshStandardMaterial({color: 0xE2E7EF, roughness: 0.14, metalness: 1});
+  MT.knurl = new THREE.MeshStandardMaterial({color: 0xB9C0CC, roughness: 0.45, metalness: 1});
+  MT.rubber = new THREE.MeshStandardMaterial({color: 0x1A1E26, roughness: 0.82, metalness: 0});
+  MT.plate = new THREE.MeshStandardMaterial({color: 0x1F232C, roughness: 0.5, metalness: 0.2});
+  MT.stack = new THREE.MeshStandardMaterial({color: 0x2E3442, roughness: 0.4, metalness: 0.6});
+  MT.accent = new THREE.MeshStandardMaterial({color: COL.p, roughness: 0.45, metalness: 0.1});
+  MT.foam = new THREE.MeshStandardMaterial({color: 0x252A36, roughness: 0.9});
+  MT.wood = new THREE.MeshStandardMaterial({color: 0xB08A62, roughness: 0.7});
+  return MT;
+}
+const shade = m => { m.castShadow = true; m.receiveShadow = true; return m; };
+/** Rounded box centred at (x, y, z). */
+const rbox = (w, h, d, m, x = 0, y = 0, z = 0, r = 0.02) => { const o = shade(new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, Math.min(r, w / 2 - 1e-3, h / 2 - 1e-3, d / 2 - 1e-3)), m)); o.position.set(x, y, z); return o; };
+/** Round tube between two points. */
+function tube(a, b, r, m, seg = 14) {
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b); const dir = B.clone().sub(A); const len = dir.length();
+  const o = shade(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg), m)); o.position.copy(A).add(B).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize()); return o;
+}
+/** Bumper plate: rubber disc with a lip and a steel hub, axis along x. */
+function plateMesh(r, t) {
+  const m = mats(); const g = new THREE.Group();
+  const prof = [[0.03, -t / 2], [r - 0.012, -t / 2], [r, -t / 2 + 0.01], [r, t / 2 - 0.01], [r - 0.012, t / 2], [r * 0.82, t / 2], [r * 0.8, t / 2 - 0.006], [0.07, t / 2 - 0.006], [0.03, t / 2]].map(([x, y]) => new THREE.Vector2(x, y));
+  const disc = shade(new THREE.Mesh(new THREE.LatheGeometry(prof.reverse(), 40), m.plate)); disc.rotation.z = Math.PI / 2; g.add(disc);
+  const hub = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, t + 0.004, 24), m.chrome)); hub.rotation.z = Math.PI / 2; g.add(hub);
+  return g;
+}
 function barbell(len = 1.9, pr = 0.22) {
-  const g = new THREE.Group();
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, len, 12), mat(COL.metal, 0.35)); bar.rotation.z = Math.PI / 2; g.add(bar);
+  const m = mats(); const g = new THREE.Group(); const h = len / 2;
+  const shaft = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.0135, 0.0135, len - 0.8, 16), m.knurl)); shaft.rotation.z = Math.PI / 2; g.add(shaft);
   for (const s of [1, -1]) {
-    for (let i = 0; i < 2; i++) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(pr - i * pr * 0.18, pr - i * pr * 0.18, 0.04, 32), mat(COL.plate, 0.7)); pl.rotation.z = Math.PI / 2; pl.position.x = s * (len / 2 - 0.25 + i * 0.05); g.add(pl); }
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 12), mat(COL.metal, 0.35)); col.rotation.z = Math.PI / 2; col.position.x = s * (len / 2 - 0.3); g.add(col);
+    const sl = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.42, 20), m.chrome)); sl.rotation.z = Math.PI / 2; sl.position.x = s * (h - 0.2); g.add(sl);
+    const col = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.035, 20), m.chrome)); col.rotation.z = Math.PI / 2; col.position.x = s * (h - 0.4); g.add(col);
+    const t1 = pr > 0.18 ? 0.055 : 0.04; const p1 = plateMesh(pr, t1); p1.position.x = s * (h - 0.4 + 0.02 + t1 / 2); g.add(p1);
+    const p2 = plateMesh(pr * 0.78, 0.035); p2.position.x = s * (h - 0.4 + 0.025 + t1 + 0.02); g.add(p2);
+    const clip = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.03, 16), m.accent)); clip.rotation.z = Math.PI / 2; clip.position.x = s * (h - 0.4 + 0.05 + t1 + 0.035); g.add(clip);
   }
   return g;
 }
 function dumbbell() {
-  const g = new THREE.Group();
-  const h = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.16, 10), mat(COL.metal, 0.35)); h.rotation.z = Math.PI / 2; g.add(h);
-  for (const s of [1, -1]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.07, 6), mat(COL.plate, 0.7)); b.rotation.z = Math.PI / 2; b.position.x = s * 0.11; g.add(b); }
+  const m = mats(); const g = new THREE.Group();
+  const hd = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.0155, 0.0155, 0.15, 16), m.knurl)); hd.rotation.z = Math.PI / 2; g.add(hd);
+  for (const s of [1, -1]) {
+    const head = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.064, 0.072, 6), m.rubber)); head.rotation.z = Math.PI / 2; head.rotation.x = Math.PI / 6; head.position.x = s * 0.111; g.add(head);
+    const cap = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.074, 20), m.chrome)); cap.rotation.z = Math.PI / 2; cap.position.x = s * 0.111; g.add(cap);
+    const ring = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.012, 20), m.chrome)); ring.rotation.z = Math.PI / 2; ring.position.x = s * 0.07; g.add(ring);
+  }
   return g;
 }
-const box = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c, 0.75)); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m; };
+/** Floor-standing frame foot: a short crossbar with rubber caps. */
+function foot(g, x, z, w, m) { g.add(rbox(w, 0.045, 0.07, m.steel, x, 0.0225, z, 0.012)); for (const s of [1, -1]) g.add(rbox(0.05, 0.02, 0.075, m.rubber, x + s * (w / 2 - 0.02), 0.01, z, 0.008)); }
 /** Static props. Each is [type, params]; positions in metres, the figure stands at the origin facing +z. */
 function prop(p) {
-  const g = new THREE.Group();
+  const m = mats(); const g = new THREE.Group();
   const [t, a = {}] = p;
-  const legs = (x0, x1, z0, z1, top) => { for (const x of [x0, x1]) for (const z of [z0, z1]) g.add(box(0.05, top, 0.05, COL.frame, x, top / 2, z)); };
-  if (t === 'bench') { // flat pad along z
-    const len = a.len || 1.2, y = a.y || 0.44, z = a.z || 0;
-    g.add(box(0.3, 0.07, len, COL.pad, a.x || 0, y, z));
-    legs(-0.09 + (a.x || 0), 0.09 + (a.x || 0), z - len * 0.38, z + len * 0.38, y - 0.035);
-  } else if (t === 'incline') { // seat + back pad leaning back at a.inc degrees from horizontal
+  if (t === 'bench') { // flat bench: cushion on a spine with two T-feet
+    const len = a.len || 1.2, y = a.y || 0.44, z = a.z || 0, x = a.x || 0;
+    g.add(rbox(0.29, 0.075, len, m.pad, x, y, z, 0.03));
+    g.add(rbox(0.07, 0.05, len * 0.86, m.steel, x, y - 0.065, z, 0.01));
+    for (const zz of [z - len * 0.38, z + len * 0.38]) { g.add(rbox(0.06, y - 0.09, 0.05, m.steel, x, (y - 0.09) / 2 + 0.02, zz, 0.01)); foot(g, x, zz, 0.46, m); }
+  } else if (t === 'incline') { // adjustable bench: seat, back pad hinged behind it, strut and ladder
     const inc = (a.inc || 40) * D, y = a.y || 0.45, len = a.len || 0.95, z0 = a.z || 0;
-    g.add(box(0.32, 0.07, 0.36, COL.pad, 0, y, z0 + 0.12));
-    const back = box(0.3, 0.07, len, COL.pad, 0, y + Math.sin(inc) * len / 2 + 0.02, z0 - Math.cos(inc) * len / 2); back.rotation.x = inc; g.add(back);
-    legs(-0.1, 0.1, z0 - 0.2, z0 + 0.25, y - 0.035);
-  } else if (t === 'seat') { // machine seat with an upright back
+    g.add(rbox(0.31, 0.075, 0.36, m.pad, 0, y, z0 + 0.12, 0.03));
+    const back = rbox(0.29, 0.075, len, m.pad, 0, y + Math.sin(inc) * len / 2 + 0.02, z0 - Math.cos(inc) * len / 2, 0.03); back.rotation.x = inc; g.add(back);
+    const ub = [0, y - 0.03 + Math.sin(inc) * len * 0.45, z0 - Math.cos(inc) * len * 0.45 + 0.03]; // under the back pad
+    g.add(tube([0, 0.08, z0 + 0.32], [0, 0.08, z0 - 0.62], 0.028, m.steel));
+    g.add(tube([0, 0.08, z0 + 0.15], [0, y - 0.05, z0 + 0.12], 0.026, m.steel));
+    g.add(tube([0, 0.08, z0 - 0.45], ub, 0.022, m.steel));
+    g.add(tube([0, y - 0.05, z0 + 0.0], [0, y - 0.05, z0 + 0.25], 0.024, m.steel));
+    foot(g, 0, z0 + 0.32, 0.5, m); foot(g, 0, z0 - 0.62, 0.5, m);
+  } else if (t === 'seat') { // machine seat on a post, upright back pad on its own post
     const y = a.y || 0.5, z = a.z || 0;
-    g.add(box(0.36, 0.08, 0.4, COL.pad, 0, y, z + 0.06));
-    if (a.back !== false) g.add(box(0.36, a.backH || 0.6, 0.08, COL.pad, 0, y + 0.04 + (a.backH || 0.6) / 2, z - 0.2 - (a.backTilt || 0)));
-    g.add(box(0.08, y - 0.04, 0.08, COL.frame, 0, (y - 0.04) / 2, z));
-    g.add(box(0.5, 0.04, 0.5, COL.frame, 0, 0.02, z));
-  } else if (t === 'box') g.add(box(a.w || 0.4, a.h || 0.4, a.d || 0.4, a.c || COL.pad, a.x || 0, a.y ?? (a.h || 0.4) / 2, a.z || 0));
-  else if (t === 'bar') { // pull-up bar
-    const y = a.y || 2.3, z = a.z || 0;
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1.4, 12), mat(COL.metal, 0.35)); b.rotation.z = Math.PI / 2; b.position.set(0, y, z); g.add(b);
-    for (const s of [1, -1]) g.add(box(0.06, y + 0.05, 0.06, COL.frame, s * 0.7, (y + 0.05) / 2, z));
-  } else if (t === 'pbars') { // dip bars along z
-    const y = a.y || 1.2;
-    for (const s of [1, -1]) {
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.8, 12), mat(COL.metal, 0.35)); b.rotation.x = Math.PI / 2; b.position.set(s * (a.w || 0.28), y, a.z || 0.1); g.add(b);
-      g.add(box(0.05, y, 0.05, COL.frame, s * (a.w || 0.28), y / 2, (a.z || 0.1) - 0.35)); g.add(box(0.05, y, 0.05, COL.frame, s * (a.w || 0.28), y / 2, (a.z || 0.1) + 0.35));
+    g.add(rbox(0.38, 0.085, 0.4, m.pad, 0, y, z + 0.06, 0.035));
+    g.add(rbox(0.07, y - 0.08, 0.07, m.steel, 0, (y - 0.08) / 2 + 0.03, z, 0.012));
+    g.add(rbox(0.56, 0.04, 0.6, m.steel, 0, 0.02, z - 0.05, 0.012));
+    if (a.back !== false) {
+      const bh = a.backH || 0.6, bz = z - 0.2 - (a.backTilt || 0);
+      g.add(rbox(0.38, bh, 0.085, m.pad, 0, y + 0.06 + bh / 2, bz, 0.035));
+      g.add(rbox(0.06, y + bh * 0.6, 0.06, m.steel, 0, (y + bh * 0.6) / 2, bz - 0.08, 0.01));
+      g.add(rbox(0.06, 0.05, 0.12, m.steel, 0, y + bh * 0.55, bz - 0.04, 0.01));
     }
-  } else if (t === 'tower') { // cable column, pulley at (a.x, a.y, a.z)
-    const x = a.x || 0, z = a.z ?? -0.8, y = a.y || 2.1;
-    g.add(box(0.12, 2.3, 0.12, COL.frame, x, 1.15, z + (a.back ?? -0.1)));
-    const pu = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.03, 16), mat(COL.metal, 0.4)); pu.rotation.z = Math.PI / 2; pu.position.set(x, y, z); g.add(pu);
+  } else if (t === 'box') { // plyo box / step
+    const h = a.h || 0.4; g.add(rbox(a.w || 0.4, h, a.d || 0.4, a.c ? new THREE.MeshStandardMaterial({color: a.c, roughness: 0.7}) : m.rubber, a.x || 0, a.y ?? h / 2, a.z || 0, 0.02));
+  } else if (t === 'bar') { // pull-up station
+    const y = a.y || 2.3, z = a.z || 0;
+    g.add(tube([-0.72, y, z], [0.72, y, z], 0.016, m.knurl, 18));
+    for (const s of [1, -1]) { g.add(rbox(0.07, y + 0.08, 0.07, m.steel, s * 0.72, (y + 0.08) / 2, z - 0.05, 0.012)); foot(g, s * 0.72, z - 0.05, 0.12, m); g.add(rbox(0.07, 0.045, 0.9, m.steel, s * 0.72, 0.0225, z - 0.05, 0.012)); }
+    g.add(rbox(1.5, 0.07, 0.07, m.steel, 0, y + 0.1, z - 0.05, 0.012));
+  } else if (t === 'pbars') { // dip station
+    const y = a.y || 1.2, w = a.w || 0.28, z = a.z || 0.1;
+    for (const s of [1, -1]) {
+      g.add(tube([s * w, y, z - 0.42], [s * w, y, z + 0.42], 0.022, m.knurl, 18));
+      for (const zz of [z - 0.36, z + 0.36]) g.add(rbox(0.06, y, 0.06, m.steel, s * w, y / 2, zz, 0.01));
+      g.add(rbox(0.07, 0.045, 0.95, m.steel, s * w, 0.0225, z, 0.012));
+    }
+    g.add(rbox(w * 2 + 0.06, 0.05, 0.06, m.steel, 0, 0.32, z - 0.36, 0.01));
+  } else if (t === 'tower') { // cable column: two uprights, weight stack on guide rods, pulley at (x, y, z)
+    const x = a.x || 0, z = a.z ?? -0.8, y = a.y || 2.1, bz = z + (a.back ?? -0.1);
+    for (const s of [1, -1]) g.add(rbox(0.07, 2.25, 0.07, m.steel, x + s * 0.2, 1.125, bz, 0.012));
+    g.add(rbox(0.47, 0.07, 0.1, m.steel, x, 2.25, bz, 0.012)); g.add(rbox(0.6, 0.05, 0.5, m.steel, x, 0.025, bz, 0.012));
+    for (let i = 0; i < 12; i++) g.add(rbox(0.28, 0.034, 0.12, i === 11 ? m.accent : m.stack, x, 0.1 + i * 0.037, bz, 0.006));
+    for (const s of [1, -1]) g.add(tube([x + s * 0.1, 0.05, bz], [x + s * 0.1, 1.6, bz], 0.008, m.chrome, 8));
+    const wheel = shade(new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.012, 10, 28), m.steel)); wheel.rotation.y = Math.PI / 2; wheel.position.set(x, y, z); g.add(wheel);
+    const hub = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.05, 14), m.chrome)); hub.rotation.z = Math.PI / 2; hub.position.set(x, y, z); g.add(hub);
+    if (Math.abs(z - bz) > 0.05) g.add(tube([x, y, z], [x, y, bz], 0.018, m.steel));
     g.userData.pulley = new THREE.Vector3(x, y, z);
-  } else if (t === 'pad') { // free box, optionally tilted
-    const b = box(a.w || 0.3, a.h || 0.08, a.d || 0.4, a.c || COL.pad, a.x || 0, a.y || 0.5, a.z || 0); b.rotation.x = (a.rx || 0) * D; g.add(b);
-  } else if (t === 'plate') { // tilted platform (hack squat, calf block)
-    const b = box(a.w || 0.6, a.h || 0.05, a.d || 0.45, a.c || COL.frame, a.x || 0, a.y || 0.03, a.z || 0); b.rotation.x = (a.rx || 0) * D; g.add(b);
-  } else if (t === 'rails') { // smith machine or hack squat rails beside the figure
-    for (const s of [1, -1]) g.add(box(0.05, 2.1, 0.05, COL.frame, s * (a.w || 0.75), 1.05, a.z || -0.05));
+  } else if (t === 'pad') { // free pad, optionally tilted
+    const b = rbox(a.w || 0.3, a.h || 0.08, a.d || 0.4, a.c ? new THREE.MeshStandardMaterial({color: a.c, roughness: 0.7}) : m.pad, a.x || 0, a.y || 0.5, a.z || 0, 0.025); b.rotation.x = (a.rx || 0) * D; g.add(b);
+  } else if (t === 'plate') { // platform (hack squat, footplate)
+    const b = rbox(a.w || 0.6, a.h || 0.05, a.d || 0.45, m.steel, a.x || 0, a.y || 0.03, a.z || 0, 0.012); b.rotation.x = (a.rx || 0) * D; g.add(b);
+    const top = rbox((a.w || 0.6) - 0.04, 0.012, (a.d || 0.45) - 0.04, m.rubber, 0, (a.h || 0.05) / 2, 0, 0.004); b.add(top);
+  } else if (t === 'rails') { // Smith machine / hack rails
+    const w = a.w || 0.75, z = a.z || -0.05;
+    for (const s of [1, -1]) { g.add(rbox(0.07, 2.2, 0.07, m.steel, s * w, 1.1, z, 0.012)); g.add(tube([s * (w - 0.06), 0.1, z + 0.05], [s * (w - 0.06), 2.05, z + 0.05], 0.012, m.chrome, 10)); g.add(rbox(0.08, 0.045, 0.8, m.steel, s * w, 0.0225, z, 0.012)); }
+    g.add(rbox(w * 2 + 0.07, 0.07, 0.07, m.steel, 0, 2.2, z, 0.012));
   }
   return g;
 }
@@ -260,7 +324,8 @@ function ensure() {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   const {scene} = R;
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8d98ad, 1.5));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8d98ad, 0.9));
+  try { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.55; pm.dispose(); } catch (e) { /* no env map, lights only */ }
   const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(2.2, 4, 3); key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, {left: -2, right: 2, top: 2.6, bottom: -1, near: 0.5, far: 12}); key.shadow.radius = 4; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.025;
   scene.add(key);
@@ -522,32 +587,49 @@ function setup(spec, muscles) {
   const pulleys = [];
   for (const p of spec.props || []) { const g = prop(p); R.props.add(g); if (g.userData.pulley) pulleys.push(g.userData.pulley); }
   const eq = spec.eq || 'none';
-  const metal = () => mat(COL.metal, 0.4);
+  const m = mats(); const metal = () => m.knurl;
   const add = (o, u) => { o.userData = u; R.tools.add(o); return o; };
   if (eq === 'bar') add(barbell(spec.barLen || 1.9, spec.plate || 0.225), {kind: 'bar'});
   if (eq === 'db') for (const s of spec.one ? [spec.one] : ['L', 'R']) add(dumbbell(), {kind: 'db', side: s});
   if (eq === 'db1') add(dumbbell(), {kind: 'one'});
-  if (eq === 'grip') for (const s of spec.one ? [spec.one] : ['L', 'R']) add(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 10), metal()), {kind: 'grip', side: s});
-  if (eq === 'sled') { const pl = box(0.62, 0.05, 0.5, COL.frame, 0, 0, 0); pl.geometry.rotateX((spec.sledTilt ?? 45) * D); const g = new THREE.Group(); g.add(pl); add(g, {kind: 'sled'}); }
+  if (eq === 'grip') for (const s of spec.one ? [spec.one] : ['L', 'R']) add(shade(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 16), metal())), {kind: 'grip', side: s});
+  if (eq === 'sled') { const pl = new THREE.Group(); pl.add(rbox(0.62, 0.05, 0.5, m.steel, 0, 0.03, 0, 0.012), rbox(0.58, 0.012, 0.46, m.rubber, 0, 0.002, 0, 0.004)); for (const s of [1, -1]) pl.add(tube([s * 0.22, 0.075, -0.25], [s * 0.22, 0.075, 0.25], 0.022, m.chrome)); pl.rotation.x = (spec.sledTilt ?? 45) * D; const g = new THREE.Group(); g.add(pl); add(g, {kind: 'sled'}); }
   if (eq === 'landmine') {
     const g = new THREE.Group();
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1, 10), mat(COL.metal, 0.35)); g.add(b); add(g, {kind: 'landmine', pivot: spec.pivot});
-    const pl = new THREE.Group(); for (let i = 0; i < 2; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.21 - i * 0.04, 0.21 - i * 0.04, 0.04, 28), mat(COL.plate, 0.7)); c.position.y = i * 0.045; pl.add(c); } add(pl, {kind: 'lmplate'});
+    const b = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1, 14), m.knurl)); g.add(b); add(g, {kind: 'landmine', pivot: spec.pivot});
+    const pl = new THREE.Group(); for (let i = 0; i < 2; i++) { const c = plateMesh(0.21 - i * 0.04, 0.045); c.rotation.z = Math.PI / 2; c.position.y = i * 0.05; pl.add(c); } add(pl, {kind: 'lmplate'});
   }
   if (eq === 'cable' || eq === 'rope' || eq === 'cable1') {
     if (!pulleys.length) { const t = prop(['tower', spec.tower || {}]); R.props.add(t); pulleys.push(t.userData.pulley); }
     const sides = eq === 'cable1' ? (spec.one ? [spec.one] : ['L', 'R']) : ['M'];
     sides.forEach((side, i) => {
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
-      const line = new THREE.Line(g, new THREE.LineBasicMaterial({color: 0x2a3142})); R.scene.add(line);
+      const line = new THREE.Line(g, new THREE.LineBasicMaterial({color: 0x1b202b})); R.scene.add(line);
       R.cables.push({line, side, from: pulleys[Math.min(i, pulleys.length - 1)]});
     });
-    if (eq !== 'cable1') { const h = new THREE.Mesh(new THREE.CylinderGeometry(eq === 'rope' ? 0.02 : 0.013, eq === 'rope' ? 0.02 : 0.013, eq === 'rope' ? 0.22 : (spec.handle || 0.5), 8), eq === 'rope' ? mat(0x3A4256, 0.9) : metal()); h.rotation.z = Math.PI / 2; const g2 = new THREE.Group(); g2.add(h); add(g2, {kind: 'handle', align: true}); }
-    else for (const s of sides) add(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 10), metal()), {kind: 'grip', side: s});
+    if (eq !== 'cable1') { const h = shade(new THREE.Mesh(new THREE.CylinderGeometry(eq === 'rope' ? 0.02 : 0.014, eq === 'rope' ? 0.02 : 0.014, eq === 'rope' ? 0.22 : (spec.handle || 0.5), 14), eq === 'rope' ? m.rubber : metal())); h.rotation.z = Math.PI / 2; const g2 = new THREE.Group(); g2.add(h); add(g2, {kind: 'handle', align: true}); }
+    else for (const s of sides) add(shade(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 16), metal())), {kind: 'grip', side: s});
   }
-  if (spec.roller) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.42, 16), mat(COL.pad, 0.8)); r.rotation.z = Math.PI / 2; const g = new THREE.Group(); g.add(r); add(g, {kind: 'roller', at: spec.roller.at ?? 0.36, z: spec.roller.z ?? 0.07, side: spec.roller.side}); }
-  for (const pd of spec.pads || []) { const b = box(pd.w, pd.h, pd.d, COL.pad, 0, 0, 0); const g = new THREE.Group(); g.add(b); add(g, {kind: 'pad', frame: pd.frame || 'chest', v: pd.v, rx: pd.rx}); }
+  if (spec.roller) { const r = shade(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.33, 6, 20), m.pad)); r.rotation.z = Math.PI / 2; const g = new THREE.Group(); g.add(r, tube([-0.24, 0, 0], [0.24, 0, 0], 0.012, m.chrome)); add(g, {kind: 'roller', at: spec.roller.at ?? 0.36, z: spec.roller.z ?? 0.07, side: spec.roller.side}); }
+  for (const pd of spec.pads || []) { const b = rbox(pd.w, pd.h, pd.d, m.pad, 0, 0, 0, 0.025); const g = new THREE.Group(); g.add(b); add(g, {kind: 'pad', frame: pd.frame || 'chest', v: pd.v, rx: pd.rx}); }
+  if (eq === 'sled') sledRails(spec, m);
   if (muscles) setMuscles(R.F, muscles);
+}
+/** Leg press carriage rails along the sled's travel, behind the footplate. */
+function sledRails(spec, m) {
+  const {J} = R.F; const mid = () => wpos(J.anL).add(wpos(J.anR)).multiplyScalar(0.5);
+  pose(0); const a = mid(); pose(1); const b = mid();
+  const t = (spec.sledTilt ?? 45) * D, n = V3(0, Math.cos(t), Math.sin(t)); // the carriage slides along the plate normal
+  const ta = a.dot(n), tb = b.dot(n), c = a.clone().addScaledVector(n, -ta);
+  const p0 = c.clone().addScaledVector(n, Math.min(ta, tb) + 0.02), p1 = c.clone().addScaledVector(n, Math.max(ta, tb) + 0.55), g = new THREE.Group();
+  for (const s of [1, -1]) {
+    const x = s * 0.4, q0 = [x, p0.y, p0.z], q1 = [x, p1.y, p1.z];
+    g.add(tube(q0, q1, 0.022, m.chrome), tube(q1, [x, 0, p1.z], 0.032, m.steel));
+    g.add(rbox(0.07, 0.045, Math.abs(p1.z - p0.z) + 0.25, m.steel, x, 0.0225, (p0.z + p1.z) / 2, 0.012));
+    if (p0.y > 0.2) g.add(tube(q0, [x, 0, p0.z], 0.03, m.steel));
+  }
+  g.add(tube([-0.4, p1.y, p1.z], [0.4, p1.y, p1.z], 0.03, m.steel));
+  R.props.add(g);
 }
 
 /**

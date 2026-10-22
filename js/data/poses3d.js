@@ -158,7 +158,7 @@ const P = {
     A: {root: [0, 0.95, 0, 0, 0], stand: 1, tilt: -3, sa: 8, el: 6, sf: 10}, B: {root: [0, 0.95, 0, 0, 0], stand: 1, tilt: -3, sa: 8, el: 136, sf: 16}},
   inclinecurl: {eq: 'db', dba: 'fx', pr: 90, ground: false, props: [['incline', {inc: 55}]], feet: {w: 0.22, z: 0.55, toe: 15}, kp: [0.3, 0, 1], view: [84, 8],
     A: {root: [0, 0.62, -0.02, -36, 0], sf: -34, el: 3, sa: 6, sr: 10}, B: {root: [0, 0.62, -0.02, -36, 0], sf: -24, el: 135, sa: 6, sr: 10}},
-  preacher: {eq: 'db', dba: 'fx', pr: 90, ground: false, props: [['seat', {y: 0.48, back: false}], ['pad', {w: 0.5, h: 0.05, d: 0.34, y: 0.89, z: 0.16, rx: 34}], ['box', {w: 0.08, h: 0.9, d: 0.08, z: 0.3}]], feet: SEATFEET, view: [74, 10],
+  preacher: {eq: 'db', dba: 'fx', pr: 90, ground: false, props: [['seat', {y: 0.48, back: false}], ['pad', {w: 0.5, h: 0.08, d: 0.34, y: 0.875, z: 0.17, rx: 34}], ['box', {w: 0.08, h: 0.9, d: 0.08, z: 0.3}]], feet: SEATFEET, view: [74, 10],
     A: {...SIT(), tilt: 10, sf: 46, sa: 12, el: 10}, B: {...SIT(), tilt: 10, sf: 46, sa: 12, el: 126}},
   conc: {eq: 'db', one: 'L', dba: 'fx', pr: [90, 0], ground: false, props: [['box', {w: 0.4, h: 0.45, d: 0.4}]], feet: {w: 0.3, z: 0.42, toe: 25}, kp: [0.6, 0, 1], view: [42, 8],
     A: {root: [0, 0.56, 0, 0, 0], tilt: 40, nk: -15, sf: [44, 40], sa: [5, 20], el: [6, 60]}, B: {root: [0, 0.56, 0, 0, 0], tilt: 40, nk: -15, sf: [44, 40], sa: [5, 20], el: [128, 60]}},
