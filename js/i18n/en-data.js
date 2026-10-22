@@ -201,7 +201,7 @@ export const EN_DATA=[
 ["Klatka prawie do podłogi","Chest almost to the floor"],
 ["Zapadnięte biodra przenoszą obciążenie na lędźwie. Napnij pośladki i brzuch.","Sagging hips shift the load to your lower back. Squeeze your glutes and abs."],
 ["Biodra w górze","Hips up high"],
-["Uniesione biodra skracają ruch klatki i zamieniają pompkę w ćwiczenie na barki.","Raised hips shorten the chest's range and turn the push-up into a shoulder exercise."],
+["Uniesione biodra skracają ruch klatki i zamieniają pompkę w ćwiczenie na barki.","Raised hips shorten the chest's range and turn the press-up into a shoulder exercise."],
 ["Pochyl tułów w przód, by mocniej pracowała klatka","Lean your torso forward so the chest works harder"],
 ["Schodź, aż ramię będzie równoległe do podłogi","Go down until your upper arm is parallel to the floor"],
 ["Barki nisko, z dala od uszu","Shoulders low, away from your ears"],

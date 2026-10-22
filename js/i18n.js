@@ -7,6 +7,8 @@ const ATTRS = ['aria-label', 'placeholder', 'title', 'alt'];
 const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE', 'NOSCRIPT']);
 const NUM = /\d+(?:[.,]\d+)?/g;
 const PL_CHARS = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/;
+/** Polish letters or common Polish words: text that must not be shown in English. */
+export const looksPolish = t => PL_CHARS.test(t) || /\b(w|z|na|od|po|ze|się|jest|nie|lub|oraz|dla|przy|bez|ponad|temu|tygodnie|tydzień|dzień|dni|dziś|więc|serii|seria|zapas|zapasem|ciężar|góra|zakresu|każdej|wracasz|zrobione|powtórzeń|ćwiczenia|ćwiczenie|trening|treningi|plecy|klatka|nogi|barki|ramiona|brzuch|uda|łydki|pośladki|cel|rekord|szac|tydz|poprzednie|zrobiona|hantel|hantle|gryf|sztanga|wyciąg|maszyna|ławka|przerwa|serie|powtórzenia|odpoczynek|trenuj|dodaj|usuń|zamień|pokaż|ukryj|zapisz|wróć|dalej|gotowe|zrobione|tak)\b/i.test(t);
 const exact = new Map(Object.entries(EN));
 const patterns = new Map(Object.entries(EN_PATTERNS));
 /** Polish text seen in English mode without a translation (for development checks). */
@@ -61,28 +63,36 @@ function core(t) {
   const r = one(t);
   if (r != null) return r;
   const m = t.match(SYM);
-  if (m && (m[1] || m[3]) && m[2]) { const c = one(m[2]); if (c != null) return m[1] + c + m[3]; }
+  if (m && (m[1] || m[3]) && m[2]) {
+    // symbols on either side: try without the leading ones, without the trailing ones, then without both
+    const a = m[3] ? one(m[2] + m[3]) : null; if (a != null) return m[1] + a;
+    const b = m[1] ? one(m[1] + m[2]) : null; if (b != null) return b + m[3];
+    const c = one(m[2]); if (c != null) return m[1] + c + m[3];
+  }
   // Known Polish openings followed by a value ("Ostatnio 80 kg × 8").
-  for (const [pl, en] of EN_PREFIX) if (t.startsWith(pl)) { const rest = t.slice(pl.length); const r2 = en + (one(rest) ?? replaced(rest)); if (!PL_CHARS.test(r2)) return r2; }
+  for (const [pl, en] of EN_PREFIX) if (t.startsWith(pl)) { const rest = t.slice(pl.length); const r2 = en + (tr(rest) ?? replaced(rest)); if (!looksPolish(r2)) return r2; }
   const q = replaced(t);
-  return q !== t && !PL_CHARS.test(q) ? q : null;
+  return q !== t && !looksPolish(q) ? q : null;
 }
 /** Word-level replacements for values such as "12 kg na hantel". */
 const replaced = t => EN_REPLACE.reduce((a, [pl, en]) => a.split(pl).join(en), t);
 
-/** Translates one phrase; returns null when nothing matched. Phrases joined with separators go piece by piece. */
-export function tr(text) {
+/** Separators, from the loosest to the tightest: a phrase is split at the first level that helps. */
+const SEPS = [/( · | — | – )/, /(: | \/ )/, /(\. )/, /(, )/];
+/** Translates one phrase; returns null when nothing matched. Joined phrases go piece by piece; a piece left in Polish fails the whole. */
+export function tr(text, lvl = 0) {
   const t = clean(text);
   if (!t) return null;
   const r = core(t);
   if (r != null) return r;
-  const parts = t.split(/( · | — | – |: |, | \/ |\. )/);
-  if (parts.length < 2) return null;
-  let changed = false;
-  const out = parts.map((p, i) => { if (i % 2 || !p) return p; const q = core(p); if (q != null) { changed = true; return q; } return p; });
-  if (!changed) return null;
-  for (let i = 0; i < out.length; i += 2) if (PL_CHARS.test(out[i])) missing.add(out[i]);
-  return out.join('');
+  for (let L = lvl; L < SEPS.length; L++) {
+    const parts = t.split(SEPS[L]);
+    if (parts.length < 2) continue;
+    let changed = false, polish = false;
+    const out = parts.map((p, i) => { if (i % 2 || !p) return p; const q = tr(p, L + 1); if (q != null) { changed = true; return q; } if (looksPolish(p)) polish = true; return p; });
+    if (!polish && changed) return out.join('');
+  }
+  return null;
 }
 
 function trNode(node) {
@@ -95,7 +105,7 @@ function trNode(node) {
     if (nv !== v) node.nodeValue = nv;
   } else {
     if (/\d,\d/.test(v)) node.nodeValue = enNum(v);
-    if (PL_CHARS.test(v) || /\b(i|w|z|na|do|od|się|jest|nie)\b/.test(v)) missing.add(clean(v));
+    if (looksPolish(v)) missing.add(clean(v));
     else if (raw) raw.add(clean(v));
   }
 }

@@ -210,7 +210,7 @@ function tick() {
     if (left <= 0) { T.on = false; beep(); $('#rest').classList.add('go'); $('#restLbl').textContent = 'Koniec przerwy'; $('#restTm').textContent = 'Czas na serię'; $('#restPb').style.width = '100%'; T.goT = setTimeout(stopRest, 6000); }
     else { $('#restTm').textContent = mmss(left); $('#restPb').style.width = (100 - left / T.total * 100) + '%'; }
   }
-  if (S.draft) { const sec = (Date.now() - new Date(S.draft.started)) / 1000; const el = sec > 12 * 3600 ? 'od ' + dateStr(S.draft.started) : hms(sec); const c = $('#elapsed'); if (c) c.textContent = el; const bt = $('#bnTime'); if (bt) bt.textContent = el; }
+  if (S.draft) { const sec = (Date.now() - new Date(S.draft.started)) / 1000; const el = sec > 12 * 3600 ? (isEn() ? 'since ' : 'od ') + dateStr(S.draft.started) : hms(sec); const c = $('#elapsed'); if (c) c.textContent = el; const bt = $('#bnTime'); if (bt) bt.textContent = el; }
 }
 setInterval(tick, 250);
 $('#restMinus').onclick = () => { T.end -= 15000; tick(); };
@@ -830,7 +830,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Mój Trener · wersja 2.5</p>';
+  h += '<p class="muted small center">Mój Trener · wersja 2.6</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {

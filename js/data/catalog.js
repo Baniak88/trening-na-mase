@@ -85,7 +85,7 @@ const EX={
   fig:{ecc:'AB',hl:['torso'],eq:[{t:'bench',pts:[[40,42],[6,42],[-34,74]]},{t:'db',at:'hand'}],
    A:{a:[66,4],hip:[16,50],t:145,hand:{sh:[6,57]},ks:1,h:150},
    B:{a:[66,4],hip:[16,50],t:145,hand:{sh:[16,6]},ks:1,es:-1,h:150}}},
- pushup:{n:'Pompki',en:'Push-up',p:'hpush',kind:'bw',inc:2.5,m:{chest:1,triceps:0.5,delts:0.5},
+ pushup:{n:'Pompki',en:'Press-up',p:'hpush',kind:'bw',inc:2.5,m:{chest:1,triceps:0.5,delts:0.5},
   cues:['Dłonie nieco szerzej niż barki','Ciało w jednej linii od głowy do pięt','Klatka schodzi prawie do podłogi','Gdy 15+ powtórzeń jest łatwe, dodaj obciążenie lub podnieś stopy'],
   err:['Opadające biodra','Łokcie rozstawione na boki'],alt:['dbbench','bench'],
   fig:{ecc:'AB',hl:['torso'],eq:[],

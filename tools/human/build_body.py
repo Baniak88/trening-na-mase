@@ -161,6 +161,19 @@ for b, lst in json.load(open(SRC + 'rigs/default_weights.mhw'))['weights'].items
         if isinstance(t, tuple): W[remap[vi], bi[t[0]]] += w * 0.45; W[remap[vi], bi[t[1]]] += w * 0.55
         else: W[remap[vi], bi[t]] += w
 W[W.sum(1) == 0, bi['head']] = 1
+# smooth the weights where the thighs meet the pelvis: without it the crotch stays behind in a deep squat
+nbr = [set() for _ in range(N)]
+for t in tris:
+    for a_ in t: nbr[a_].update(t)
+Wn = W / np.maximum(W.sum(1, keepdims=True), 1e-9)
+hipY0, hipZ0 = head('upperleg01.L')[1], head('upperleg01.L')[2]
+zone = np.where((np.abs(V[used, 0] * 1) < 0.16) & (V[used, 1] > hipY0 - 0.2) & (V[used, 1] < hipY0 + 0.06))[0]
+legs_cols = [bi[n] for n in ('pelvis', 'hpL', 'hpR', 'spine')]
+for _ in range(25):
+    Q = Wn.copy()
+    for i in zone: Q[i] = Wn[i] * 0.4 + Wn[list(nbr[i])].mean(0) * 0.6
+    Wn[zone] = Q[zone]
+W = Wn
 top = np.argsort(-W, 1)[:, :4]
 tw = np.take_along_axis(W, top, 1); tw = tw / tw.sum(1, keepdims=True)
 tw8 = np.round(tw * 255).astype(int); tw8[:, 0] += 255 - tw8.sum(1)
@@ -201,6 +214,8 @@ for s in ('L', 'R'):
     C = BONES[bi['kn' + s]][3]; loc = (P - kn) @ C.T; w = wb('kn' + s)
     M[:, 10] = np.maximum(M[:, 10], w * ss(-0.005, -0.03, loc[:, 2]) * ss(-0.03, -0.07, loc[:, 1]) * (1 - ss(-0.26, -0.32, loc[:, 1])))
 M = np.clip(M, 0, 1)
+for _ in range(4):  # soften the borders between muscles
+    M = M * 0.5 + np.array([M[list(nbr[i])].mean(0) for i in range(N)]) * 0.5
 # shorts and shoes
 an_y = anL[1]
 cloth = np.zeros(N)  # 0 skin .. 1 shorts / shoe / hair, blended at the edges
