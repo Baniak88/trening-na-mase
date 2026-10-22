@@ -664,7 +664,7 @@ export const EN={
 "Jak poprawnie wykonać to ćwiczenie i jak je wpleść w mój plan?": "How do I do this exercise properly and how do I fit it into my plan?",
 "mięśnie główne": "main muscles",
 "pomocnicze": "assisting",
-"Mój Trener · wersja 2.3": "My Trainer · version 2.3",
+"Mój Trener · wersja 2.4": "My Trainer · version 2.4",
 "przeciągnij, żeby obrócić": "drag to rotate"
 };
 export const EN_PATTERNS={

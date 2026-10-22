@@ -830,7 +830,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Mój Trener · wersja 2.3</p>';
+  h += '<p class="muted small center">Mój Trener · wersja 2.4</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {
@@ -1038,7 +1038,7 @@ function renderBar() {
 }
 function renderBanner() {
   const b = $('#sessBanner'); const show = !!S.draft && ((UI.tab !== 'train' && UI.tab !== 'home') || !!UI.sub); b.hidden = !show;
-  if (show) { const d = S.draft; const [c, t] = counts(d); b.innerHTML = '<button class="bn" data-act="back-train"><span><b>Trening w toku</b> · ' + esc(d.title || '') + ' · ' + c + '/' + t + ' serii · <span class="mono" id="bnTime"></span></span><span>Wróć ›</span></button>'; }
+  if (show) { const d = S.draft; const [c, t] = counts(d); b.innerHTML = '<button class="bn" data-act="back-train"><span class="bn-dot" aria-hidden="true"></span><span class="bn-txt"><b>Trening w toku</b><span class="bn-sub"><span>' + esc(d.title || '') + '</span> · <span>' + c + '/' + t + ' serii</span> · <span class="mono" id="bnTime"></span></span></span><span class="bn-go">Wróć</span><i class="bn-bar" style="width:' + (t ? Math.round(100 * c / t) : 0) + '%"></i></button>'; }
 }
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-current', !UI.sub && b.dataset.tab === UI.tab ? 'page' : 'false'));

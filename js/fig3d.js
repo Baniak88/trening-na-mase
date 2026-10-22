@@ -4,6 +4,10 @@
 import * as THREE from './vendor/three.module.min.js';
 
 const D = Math.PI / 180;
+/* Segment lengths (m): upper arm, forearm to wrist, wrist to grip centre; thigh, shin. */
+const ARM = {a: 0.3, f: 0.275, g: 0.05}; ARM.b = ARM.f + ARM.g;
+const LEG = {a: 0.44, b: 0.43};
+const ANKLE_Y = 0.068; // ankle height when the foot is flat on the floor
 const COL = {body: 0xCBD5E3, shorts: 0x2C3346, shoe: 0x2C3346, hair: 0x3A3F4C, p: 0xFF6A3D, s: 0xFFB08F,
   metal: 0x8C96A8, plate: 0x2F3544, pad: 0x3A4256, frame: 0x6B7487, cable: 0x55607A};
 
@@ -77,7 +81,7 @@ export function buildFigure() {
   add(pelvis, sphere(0.085, 1, 1.0, 0.75), cloth, 'glutes', COL.shorts, -0.07, -0.06, -0.068);
   const spine = joint('spine', pelvis, 0, 0.06, 0);
   add(spine, xf(limbGeo(0.22, 0.132, 0.142, 0.02), 1, 1, 0.7, Math.PI), skin, REG.waist);
-  const chest = joint('chest', spine, 0, 0.2, 0);
+  const chest = joint('chest', spine, 0, 0.18, 0);
   add(chest, xf(limbGeo(0.29, 0.145, 0.19, 0.05), 1.08, 1, 0.62, Math.PI), skin, REG.torso);
   add(chest, sphere(0.088, 1.12, 0.7, 0.3), skin, 'chest', COL.body, 0.074, 0.19, 0.085);
   add(chest, sphere(0.088, 1.12, 0.7, 0.3), skin, 'chest', COL.body, -0.074, 0.19, 0.085);
@@ -95,12 +99,12 @@ export function buildFigure() {
     const L = s > 0 ? 'L' : 'R';
     const sh = joint('sh' + L, chest, s * 0.205, 0.245, -0.005);
     add(sh, sphere(0.07, 1.0, 1.1, 1.0), skin, 'delts', COL.body, s * 0.008, -0.025, 0);
-    add(sh, limbGeo(0.29, 0.058, 0.045, 0.06), skin, REG.upper);
-    add(sh, sphere(0.036, 1, 2.1, 0.62), skin, 'biceps', COL.body, 0, -0.15, 0.03);
+    add(sh, limbGeo(0.3, 0.058, 0.045, 0.06), skin, REG.upper);
+    add(sh, sphere(0.036, 1, 2.1, 0.62), skin, 'biceps', COL.body, 0, -0.155, 0.03);
     add(sh, sphere(0.038, 1, 2.2, 0.6), skin, 'triceps', COL.body, 0, -0.13, -0.03);
-    const el = joint('el' + L, sh, 0, -0.29, 0);
-    add(el, limbGeo(0.26, 0.047, 0.032, 0.1), skin, REG.fore);
-    const hand = joint('hand' + L, el, 0, -0.27, 0);
+    const el = joint('el' + L, sh, 0, -ARM.a, 0);
+    add(el, limbGeo(0.27, 0.047, 0.032, 0.1), skin, REG.fore);
+    const hand = joint('hand' + L, el, 0, -ARM.f, 0);
     add(hand, sphere(0.036, 0.75, 1.25, 1.0), skin, null, COL.body, 0, -0.035, 0.005);
   }
   for (const s of [1, -1]) {
@@ -110,10 +114,10 @@ export function buildFigure() {
     add(hp, limbGeo(0.44, 0.08, 0.052, 0.06), skin, REG.thigh);
     add(hp, sphere(0.06, 1.1, 2.7, 0.5), skin, 'quads', COL.body, 0, -0.24, 0.042);
     add(hp, sphere(0.055, 1.05, 2.6, 0.45), skin, 'hams', COL.body, 0, -0.24, -0.045);
-    const kn = joint('kn' + L, hp, 0, -0.44, 0);
+    const kn = joint('kn' + L, hp, 0, -LEG.a, 0);
     add(kn, limbGeo(0.43, 0.05, 0.034, 0.06), skin, REG.shin);
     add(kn, sphere(0.042, 1.05, 2.2, 0.62), skin, 'calves', COL.body, 0, -0.12, -0.03);
-    const an = joint('an' + L, kn, 0, -0.43, 0);
+    const an = joint('an' + L, kn, 0, -LEG.b, 0);
     const foot = add(an, sphere(0.05, 0.85, 0.55, 2.3), shoe, null, 0, 0, -0.04, 0.06);
     foot.userData.foot = true;
   }
@@ -175,29 +179,45 @@ function prop(p) {
     g.userData.pulley = new THREE.Vector3(x, y, z);
   } else if (t === 'pad') { // free box, optionally tilted
     const b = box(a.w || 0.3, a.h || 0.08, a.d || 0.4, a.c || COL.pad, a.x || 0, a.y || 0.5, a.z || 0); b.rotation.x = (a.rx || 0) * D; g.add(b);
+  } else if (t === 'plate') { // tilted platform (hack squat, calf block)
+    const b = box(a.w || 0.6, a.h || 0.05, a.d || 0.45, a.c || COL.frame, a.x || 0, a.y || 0.03, a.z || 0); b.rotation.x = (a.rx || 0) * D; g.add(b);
   } else if (t === 'rails') { // smith machine or hack squat rails beside the figure
     for (const s of [1, -1]) g.add(box(0.05, 2.1, 0.05, COL.frame, s * (a.w || 0.75), 1.05, a.z || -0.05));
   }
   return g;
 }
 
-/* ---------- Pose ---------- */
+/* ---------- Pose ----------
+ * Each key position sets trunk angles (FK) plus optional targets that are solved with two-bone IK:
+ * hands go to the bar, the chest, the floor; feet stay planted. Targets are blended in world space, so the
+ * bar travels the way it should (to the lower chest, over the middle of the foot) instead of wherever the
+ * interpolated joint angles happen to put it. See js/data/poses3d.js for the fields. */
 const lerp = (a, b, t) => a + (b - a) * t;
-const DEF = {root: [0, 0.95, 0, 0, 0], tilt: 0, sp: 0, ch: 0, nk: 0, hd: 0, sf: 0, sa: 8, sr: 0, el: 8, wr: 0, hf: 0, ha: 4, kn: 0, an: 0};
+const DEF = {root: [0, 0.95, 0, 0, 0], tilt: 0, sp: 0, nk: 0, hd: 0, sf: 0, sa: 8, sr: 0, el: 8, wr: 0, hf: 0, ha: 4, kn: 0, an: 0, bal: 0, stand: 0};
+const TKEYS = new Set(['hw', 'hc', 'hp', 'hs', 'hv', 'hr', 'at']);
+const isPair = v => Array.isArray(v) && v.length === 2 && (v[0] === null || v[1] === null || Array.isArray(v[0]) || Array.isArray(v[1]));
+function mixv(a, b, t) {
+  if (typeof a === 'number' && typeof b === 'number') return lerp(a, b, t);
+  if (Array.isArray(a) && Array.isArray(b)) return a.map((v, i) => (v == null || b[i] == null ? (t < 0.5 ? v : b[i]) : mixv(v, b[i], t)));
+  if (Array.isArray(a) && typeof b === 'number') return a.map(v => mixv(v, b, t));
+  if (typeof a === 'number' && Array.isArray(b)) return b.map(v => mixv(a, v, t));
+  return t < 0.5 ? a : b;
+}
 function mix(A, B, t) {
   const o = {};
   for (const k of new Set([...Object.keys(A), ...Object.keys(B)])) {
-    const dflt = k === 'ch' ? undefined : DEF[k];
-    const a = A[k] ?? (k === 'ch' ? (A.sp || 0) * 0.6 : dflt) ?? B[k], b = B[k] ?? (k === 'ch' ? (B.sp || 0) * 0.6 : dflt) ?? A[k];
-    if (Array.isArray(a) || Array.isArray(b)) { const aa = Array.isArray(a) ? a : [a, a], bb = Array.isArray(b) ? b : [b, b]; o[k] = aa.map((v, i) => lerp(v, bb[i] ?? v, t)); }
-    else o[k] = typeof a === 'number' ? lerp(a, b, t) : t < 0.5 ? a : b;
+    if (TKEYS.has(k)) continue;
+    const dA = k === 'ch' ? (A.sp || 0) * 0.6 : DEF[k], dB = k === 'ch' ? (B.sp || 0) * 0.6 : DEF[k];
+    o[k] = mixv(A[k] ?? dA ?? B[k], B[k] ?? dB ?? A[k], t);
   }
+  o.atw = lerp(A.at ? 1 : 0, B.at ? 1 : 0, t);
+  o.at = A.at && B.at ? mixv(A.at, B.at, t) : A.at || B.at;
   return o;
 }
 /** Applies joint angles (degrees). sh/el/hp/kn/an take [left, right] or one number for both. */
 function apply(F, p) {
   const J = F.J; const two = v => (Array.isArray(v) ? v : [v, v]);
-  const r = p.root || [0, 0.95, 0, 0, 0]; // [x, y, z, pitch, yaw]
+  const r = p.root || DEF.root; // [x, y, z, pitch, yaw]
   J.root.position.set(r[0], r[1], r[2]); J.root.rotation.set(0, 0, 0); J.root.rotation.order = 'YXZ'; J.root.rotation.y = (r[4] || 0) * D; J.root.rotation.x = ((r[3] || 0) + (p.tilt || 0)) * D;
   J.spine.rotation.set((p.sp || 0) * D, 0, 0); J.chest.rotation.set((p.ch ?? (p.sp || 0) * 0.6) * D, 0, 0);
   J.neck.rotation.set((p.nk || 0) * D, 0, 0); J.head.rotation.set((p.hd || 0) * D, 0, 0);
@@ -211,35 +231,71 @@ function apply(F, p) {
     J['an' + L].rotation.set(-an[i] * D, 0, 0);
   });
 }
-const _v = new THREE.Vector3(), _b = new THREE.Box3();
-/** Lowest point of the feet in world space. */
-function footFloor(F) {
-  let min = Infinity;
-  F.root.updateMatrixWorld(true);
-  F.root.traverse(o => { if (o.userData.foot) { _b.setFromObject(o); min = Math.min(min, _b.min.y); } });
-  return min;
+
+/* ---------- IK ---------- */
+const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const _m4 = new THREE.Matrix4(), _q1 = new THREE.Quaternion(), _e = new THREE.Euler();
+const wpos = o => { o.updateWorldMatrix(true, false); return o.getWorldPosition(V3()); };
+const wquat = o => { o.updateWorldMatrix(true, false); return o.getWorldQuaternion(new THREE.Quaternion()); };
+/** Points j1 (upper joint) and bends j2 so the end of the chain reaches T, bending towards the pole.
+ * Arms bend towards local +z, legs towards -z. Returns how far the target is out of reach (m). */
+function twoBone(j1, j2, a, b, T, pole, arm) {
+  const S = wpos(j1);
+  const d = T.clone().sub(S); const L0 = d.length();
+  const dir = L0 > 1e-6 ? d.divideScalar(L0) : V3(0, -1, 0);
+  const L = Math.min(a + b - 1e-4, Math.max(Math.abs(a - b) + 1e-3, L0));
+  const cosA = (a * a + L * L - b * b) / (2 * a * L), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+  const pp = pole.clone().addScaledVector(dir, -pole.dot(dir));
+  if (pp.lengthSq() < 1e-8) pp.set(0, 0, 1).addScaledVector(dir, -dir.z);
+  pp.normalize();
+  const E = S.clone().addScaledVector(dir, a * cosA).addScaledVector(pp, a * sinA);
+  const Y = S.clone().sub(E).divideScalar(a);
+  const f = S.clone().addScaledVector(dir, L).sub(E).divideScalar(b);
+  const c = -f.dot(Y);
+  const Z = f.clone().addScaledVector(Y, c);
+  if (Z.lengthSq() < 1e-6) Z.copy(pp).negate().addScaledVector(Y, pp.dot(Y));
+  Z.normalize(); if (!arm) Z.negate();
+  const X = V3().crossVectors(Y, Z);
+  _m4.makeBasis(X, Y, Z); _q1.setFromRotationMatrix(_m4);
+  j1.quaternion.copy(wquat(j1.parent).invert().multiply(_q1));
+  const bend = Math.atan2(Math.sqrt(Math.max(0, 1 - c * c)), c);
+  j2.rotation.set(arm ? -bend : bend, 0, 0);
+  j1.updateWorldMatrix(false, true);
+  return Math.max(0, L0 - (a + b));
 }
-const handPos = (F, L) => F.J['hand' + L].localToWorld(_v.set(0, -0.04, 0.01)).clone();
+const FOOT_BALL = V3(0, -0.062, 0.125); // ball of the foot in ankle space
+const footQ = (yaw, pitch) => new THREE.Quaternion().setFromEuler(_e.set(pitch * D, yaw * D, 0, 'YXZ'));
+const handPos = (F, L) => F.J['hand' + L].localToWorld(V3(0, -ARM.g, 0.01));
+const SIDES = [['L', 1, 0], ['R', -1, 1]];
+const pick = (v, i) => (isPair(v) ? v[i] : v);
+const num = (v, i, d) => { const x = Array.isArray(v) ? v[i] : v; return x == null ? d : x; };
 
 /* ---------- Scene and player ---------- */
-let R = null; // shared renderer state
-function ensure() {
+let R = null; // shared state: one figure, one renderer
+function stage() {
   if (R) return R;
+  const scene = new THREE.Scene();
+  const F = buildFigure(); scene.add(F.root);
+  R = {scene, F, props: new THREE.Group(), tools: new THREE.Group(), cables: [], spec: null, t: 0, last: 0, raf: 0, el: null, yaw: 0, drag: null, hold: -1, err: 0};
+  scene.add(R.props, R.tools);
+  return R;
+}
+function ensure() {
+  stage();
+  if (R.renderer) return R;
   const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, powerPreference: 'low-power'});
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
-  const scene = new THREE.Scene();
+  const {scene} = R;
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8d98ad, 1.5));
   const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(2.2, 4, 3); key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, {left: -2, right: 2, top: 2.5, bottom: -1, near: 0.5, far: 12}); key.shadow.radius = 4; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.025;
+  key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, {left: -2, right: 2, top: 2.6, bottom: -1, near: 0.5, far: 12}); key.shadow.radius = 4; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.025;
   scene.add(key);
   const rim = new THREE.DirectionalLight(0xbfd3ff, 0.9); rim.position.set(-3, 2.5, -2.5); scene.add(rim);
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 48), new THREE.ShadowMaterial({opacity: 0.16})); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-  const camera = new THREE.PerspectiveCamera(30, 4 / 3, 0.1, 30);
-  const F = buildFigure(); scene.add(F.root);
-  R = {renderer, scene, camera, F, props: new THREE.Group(), tools: new THREE.Group(), cables: [], spec: null, t: 0, last: 0, raf: 0, el: null, yaw: 0, drag: null, hold: -1};
-  scene.add(R.props, R.tools);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(1.7, 48), new THREE.ShadowMaterial({opacity: 0.16})); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  R.camera = new THREE.PerspectiveCamera(30, 4 / 3, 0.1, 30);
+  R.renderer = renderer;
   return R;
 }
 
@@ -259,32 +315,161 @@ export function setMuscles(F, m) {
 
 function clear(g) { while (g.children.length) { const c = g.children.pop(); c.traverse(o => { if (o.geometry) o.geometry.dispose(); }); } }
 
-/** Tempo: hold A, move to B (concentric), hold B, return (eccentric, slower). */
-const TL = [[0, 0, 600], [0, 1, 1300], [1, 1, 500], [1, 0, 1900]];
+/** Tempo: pause, the first half of the rep, short pause, the second half. The lowering (eccentric) half is slower. */
 const easeIO = k => 0.5 - 0.5 * Math.cos(Math.PI * k);
-function phaseK(t) {
+function phaseK(t, ecc) {
+  const TL = ecc ? [[0, 0, 500], [0, 1, 1900], [1, 1, 350], [1, 0, 1200]] : [[0, 0, 450], [0, 1, 1200], [1, 1, 500], [1, 0, 1900]];
   const tot = TL.reduce((a, p) => a + p[2], 0); t %= tot;
   for (const [a, b, d] of TL) { if (t < d) return a + (b - a) * easeIO(t / d); t -= d; }
   return 0;
 }
 
+/** Key positions around k: [first, second, local t]. M (optional) sits at spec.mk (default 0.5). */
+function segment(spec, k) {
+  if (!spec.M) return [spec.A, spec.B, k];
+  const m = spec.mk ?? 0.5;
+  return k <= m ? [spec.A, spec.M, k / m] : [spec.M, spec.B, (k - m) / (1 - m)];
+}
+/** Hand target of one key position for one side: a world point, a direction from the shoulder, or null (FK). */
+function target(K, i, s, g) {
+  const {J} = R.F, L = i ? 'R' : 'L';
+  for (const key of ['hw', 'hc', 'hp', 'hs', 'hv']) {
+    if (K[key] === undefined) continue;
+    const pair = isPair(K[key]); const v = pair ? K[key][i] : K[key];
+    if (!v) continue;
+    const x = key === 'hs' || key === 'hv' || pair ? s * v[0] : v[0] + s * g;
+    const p = V3(key === 'hw' && pair ? v[0] : x, v[1], v[2]);
+    if (key === 'hw') return {p};
+    if (key === 'hc') return {p: J.chest.localToWorld(p)};
+    if (key === 'hp') return {p: J.pelvis.localToWorld(p)};
+    if (key === 'hs') return {p: wpos(J['sh' + L]).add(p)};
+    return {d: p.normalize(), r: num(K.hr, i, ARM.a + ARM.b - 0.02)};
+  }
+  return null;
+}
+function dirPoint(t, L) { const {J} = R.F; return wpos(J['sh' + L]).addScaledVector(t.d.clone().applyQuaternion(wquat(J.chest)), t.r); }
+function handTargets(spec, k, p) {
+  const [K0, K1, t] = segment(spec, k); const g = p.g ?? spec.grip ?? 0.25;
+  return SIDES.map(([L, s, i]) => {
+    const a = target(K0, i, s, g), b = target(K1, i, s, g);
+    if (!a || !b) return null;
+    if (a.d && b.d) { const qa = new THREE.Quaternion(), qb = new THREE.Quaternion().setFromUnitVectors(a.d, b.d); qa.slerp(qb, t); return dirPoint({d: a.d.clone().applyQuaternion(qa), r: lerp(a.r, b.r, t)}, L); }
+    const pa = a.d ? dirPoint(a, L) : a.p, pb = b.d ? dirPoint(b, L) : b.p;
+    return pa.lerp(pb, t);
+  });
+}
+function solveArms(spec, p, T) {
+  const {J} = R.F; const ep = p.ep ?? spec.ep ?? [1, -0.6, -0.3]; const cq = wquat(J.chest); let err = 0;
+  SIDES.forEach(([L, s, i]) => {
+    if (!T[i]) return;
+    const e = Array.isArray(ep[0]) ? ep[i] : ep;
+    J['hand' + L].rotation.set(0, 0, 0);
+    err = Math.max(err, twoBone(J['sh' + L], J['el' + L], ARM.a, ARM.b, T[i], V3(s * e[0], e[1], e[2]).applyQuaternion(cq), true));
+  });
+  return err;
+}
+const handsMid = F => handPos(F, 'L').add(handPos(F, 'R')).multiplyScalar(0.5);
+function shift(F, v) { F.root.position.add(v); F.root.updateMatrixWorld(true); }
+/** World positions of the ankles and the foot rotations for this frame. */
+function feetFrame(spec, p) {
+  const f = spec.feet; const r = p.root || DEF.root;
+  return SIDES.map(([L, s, i]) => {
+    const yaw = (r[4] || 0) + s * num(p.ftoe, i, f.toe ?? 12), q = footQ(yaw, num(p.fp, i, 0));
+    const pt = V3(s * num(p.fx, i, f.w ?? 0.14), num(p.fy, i, f.y ?? (num(f.ball, i, false) ? 0.02 : ANKLE_Y)), num(p.fz, i, f.z ?? 0));
+    if (num(f.ball, i, false)) pt.sub(FOOT_BALL.clone().applyQuaternion(q));
+    return {pt, q};
+  });
+}
+function hipPos(F, L) { return wpos(F.J['hp' + L]); }
+/** Raises or lowers the body so the legs are almost straight (standing tall). */
+function standTall(F, ft, w, only, soft) {
+  let dy = Infinity;
+  SIDES.forEach(([L, s, i]) => { if (!only.includes(L)) return; const h = hipPos(F, L), a = ft[i].pt; const dh = Math.hypot(h.x - a.x, h.z - a.z); const reach = LEG.a + LEG.b - soft; if (dh < reach) dy = Math.min(dy, a.y + Math.sqrt(reach * reach - dh * dh) - h.y); });
+  if (dy < Infinity) shift(F, V3(0, dy * w, 0));
+}
+function balPoint(spec, F) {
+  const b = spec.bal; if (b === 'hands') return handsMid(F);
+  return (b.f === 'p' ? F.J.pelvis : F.J.chest).localToWorld(V3(...b.v));
+}
+
 function pose(k) {
-  const {F, spec} = R;
-  const p = mix(spec.A, spec.B, k);
-  apply(F, p);
-  if (spec.hands) { // hands fixed on a bar or the floor: move the whole body so they land there
-    F.root.updateMatrixWorld(true); const m = handPos(F, 'L').add(handPos(F, 'R')).multiplyScalar(0.5);
-    F.root.position.add(new THREE.Vector3(...spec.hands).sub(m)); F.root.updateMatrixWorld(true);
-  } else if (spec.ground !== false) { const f = footFloor(F); F.root.position.y -= f; F.root.updateMatrixWorld(true); }
-  // tools follow the hands
-  const hl = handPos(F, 'L'), hr = handPos(F, 'R');
+  const {F, spec} = R; const J = F.J;
+  if (spec.bal0 && R.bal0 == null) {
+    R.bal0 = 0; pose(0);
+    const ft0 = feetFrame(spec, mix(...segment(spec, 0).slice(0, 2), 0));
+    R.bal0 = (spec.balZ ?? (ft0[0].pt.z + ft0[1].pt.z) / 2 + 0.05) - balPoint(spec, F).z;
+  }
+  const [K0, K1, t] = segment(spec, k);
+  const p = mix(K0, K1, t);
+  apply(F, p); F.root.updateMatrixWorld(true);
+  if (spec.pin) { const fr = spec.pin.f === 'p' ? J.pelvis : J.chest; shift(F, V3(...spec.pin.w).sub(fr.localToWorld(V3(...spec.pin.v)))); }
+  if (spec.rest != null) shift(F, V3(0, spec.rest - trunkFloor(F), 0)); // lying on the floor: the back rests on it
+  const ft = spec.feet ? feetFrame(spec, p) : null;
+  const needHands = p.atw > 0 || (spec.bal === 'hands' && (p.bal ?? 1) > 0) || spec.hands;
+  if (needHands) solveArms(spec, p, handTargets(spec, k, p));
+  if (spec.hands) shift(F, V3(...spec.hands).sub(handsMid(F)));
+  else if (p.atw > 0) shift(F, V3(...p.at).sub(handsMid(F)).multiplyScalar(p.atw));
+  if (spec.bal0) shift(F, V3(0, 0, R.bal0)); // balance measured once in the start position: the body does not drift during the rep
+  const balW = spec.bal ? p.bal ?? 0 : 0;
+  const balZ = () => spec.balZ ?? (ft ? (ft[0].pt.z + ft[1].pt.z) / 2 + 0.05 : 0.05);
+  if (balW > 0) shift(F, V3(0, 0, (balZ() - balPoint(spec, F).z) * balW));
+  const only = spec.fik || 'LR', soft = p.soft ?? 0.008;
+  if (ft && p.stand > 0) { standTall(F, ft, p.stand, only, soft); if (balW > 0) { shift(F, V3(0, 0, (balZ() - balPoint(spec, F).z) * balW)); standTall(F, ft, p.stand, only, soft); } }
+  let err = 0;
+  if (ft) {
+    const kp = p.kp ?? spec.kp ?? [0.25, 0, 1]; const r = p.root || DEF.root; const kq = footQ(r[4] || 0, r[3] || 0);
+    SIDES.forEach(([L, s, i]) => {
+      if (!only.includes(L)) return;
+      const e = Array.isArray(kp[0]) ? kp[i] : kp;
+      err = Math.max(err, twoBone(J['hp' + L], J['kn' + L], LEG.a, LEG.b, ft[i].pt, V3(s * e[0], e[1], e[2]).applyQuaternion(kq), false));
+      J['an' + L].quaternion.copy(wquat(J['kn' + L]).invert().multiply(ft[i].q));
+    });
+  } else if (spec.ground !== false) { shift(F, V3(0, -footFloor(F), 0)); }
+  err = Math.max(err, solveArms(spec, p, handTargets(spec, k, p)));
+  F.root.updateMatrixWorld(true);
+  R.err = err;
+  placeTools(F, spec);
+}
+const _b = new THREE.Box3(), _tv = new THREE.Vector3();
+/** Lowest skin point of the trunk and head (meshes on pelvis, spine, chest, neck, head). */
+function trunkFloor(F) {
+  F.root.updateMatrixWorld(true); let min = Infinity;
+  for (const n of ['pelvis', 'spine', 'chest', 'neck', 'head']) for (const m of F.J[n].children) {
+    if (!m.isMesh) continue; const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 2) { _tv.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); if (_tv.y < min) min = _tv.y; }
+  }
+  return min;
+}
+/** Lowest point of the feet in world space. */
+function footFloor(F) {
+  let min = Infinity;
+  F.root.updateMatrixWorld(true);
+  F.root.traverse(o => { if (o.userData.foot) { _b.setFromObject(o); min = Math.min(min, _b.min.y); } });
+  return min;
+}
+const AX = {x: V3(1, 0, 0), y: V3(0, 1, 0), z: V3(0, 0, 1)};
+function placeTools(F, spec) {
+  const J = F.J; const hl = handPos(F, 'L'), hr = handPos(F, 'R');
+  const dba = spec.dba || 'cx', fr = s => (dba[0] === 'c' ? J.chest : J['hand' + s]);
   R.tools.children.forEach(o => {
-    if (o.userData.kind === 'bar') { o.position.copy(hl).add(hr).multiplyScalar(0.5); o.lookAt(o.position.clone().add(hl.clone().sub(hr))); o.rotateY(-Math.PI / 2); }
-    else if (o.userData.kind === 'db') { o.position.copy(o.userData.side === 'L' ? hl : hr); const fw = F.J['hand' + o.userData.side]; fw.getWorldQuaternion(o.quaternion); if (o.userData.neutral) o.rotateY(Math.PI / 2); }
-    else if (o.userData.kind === 'handle') { o.position.copy(hl).add(hr).multiplyScalar(0.5); if (o.userData.align) { o.lookAt(o.position.clone().add(hl.clone().sub(hr))); o.rotateY(-Math.PI / 2); } }
-    else if (o.userData.kind === 'one') { o.position.copy(hl).add(hr).multiplyScalar(0.5); F.J.handL.getWorldQuaternion(o.quaternion); o.rotateX(Math.PI / 2); }
-    else if (o.userData.kind === 'grip') { o.position.copy(o.userData.side === 'L' ? hl : hr); }
-    else if (o.userData.kind === 'sled') { const fl = F.J.anL.localToWorld(new THREE.Vector3(0, -0.03, 0.06)), fr = F.J.anR.localToWorld(new THREE.Vector3(0, -0.03, 0.06)); o.position.copy(fl).add(fr).multiplyScalar(0.5); }
+    const u = o.userData;
+    if (u.kind === 'bar') { o.position.copy(hl).add(hr).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(AX.x, hl.clone().sub(hr).normalize()); }
+    else if (u.kind === 'db' || u.kind === 'one') {
+      const side = u.side || 'L'; const q = wquat(fr(side));
+      o.position.copy(u.kind === 'one' ? hl.clone().add(hr).multiplyScalar(0.5) : side === 'L' ? hl : hr);
+      if (spec.dbo) o.position.add(V3(...spec.dbo).applyQuaternion(q));
+      o.quaternion.setFromUnitVectors(AX.x, AX[dba[1]].clone().applyQuaternion(q));
+    }
+    else if (u.kind === 'handle') { o.position.copy(hl).add(hr).multiplyScalar(0.5); if (u.align) o.quaternion.setFromUnitVectors(AX.x, hl.clone().sub(hr).normalize()); }
+    else if (u.kind === 'grip') { o.position.copy(u.side === 'L' ? hl : hr); }
+    else if (u.kind === 'sled') { const sp = spec.sledBall || (spec.feet && spec.feet.ball) ? V3(0, -0.075, 0.125) : V3(0, -0.075, 0.06); const fl = J.anL.localToWorld(sp.clone()), fr2 = J.anR.localToWorld(sp); o.position.copy(fl).add(fr2).multiplyScalar(0.5); }
+    else if (u.kind === 'roller') { const a = J.knL.localToWorld(V3(0, -u.at, u.z)), b = J.knR.localToWorld(V3(0, -u.at, u.z)); o.position.copy(u.side === 'L' ? a : u.side === 'R' ? b : a.add(b).multiplyScalar(0.5)); }
+    else if (u.kind === 'pad') { o.position.copy(J[u.frame].localToWorld(V3(...u.v))); o.quaternion.copy(wquat(J[u.frame])).multiply(new THREE.Quaternion().setFromEuler(_e.set((u.rx || 0) * D, 0, 0))); }
+    else if (u.kind === 'landmine') {
+      const piv = V3(...u.pivot), h = hl.clone().add(hr).multiplyScalar(0.5); const dir = h.clone().sub(piv); const len = dir.length() + 0.25; dir.normalize();
+      o.position.copy(piv).addScaledVector(dir, len / 2); o.quaternion.setFromUnitVectors(AX.y, dir); o.scale.set(1, len, 1); R.lm = {h, dir};
+    }
+    else if (u.kind === 'lmplate' && R.lm) { o.position.copy(R.lm.h).addScaledVector(R.lm.dir, 0.15); o.quaternion.setFromUnitVectors(AX.y, R.lm.dir); }
   });
   for (const c of R.cables) {
     const to = c.side === 'L' ? hl : c.side === 'R' ? hr : hl.clone().add(hr).multiplyScalar(0.5);
@@ -295,7 +480,7 @@ function pose(k) {
 /** Box around the figure, its props and tools over the whole movement. */
 function fitBox() {
   const box = new THREE.Box3();
-  for (const k of [0, 0.5, 1]) { pose(k); R.scene.updateMatrixWorld(true); box.expandByObject(R.F.root); box.expandByObject(R.tools); }
+  for (const k of [0, 0.25, 0.5, 0.75, 1]) { pose(k); R.scene.updateMatrixWorld(true); box.expandByObject(R.F.root); box.expandByObject(R.tools); }
   box.expandByObject(R.props);
   return box;
 }
@@ -303,17 +488,16 @@ function frameCamera() {
   const {camera, spec} = R;
   const v = spec.view || [35, 12];
   const yaw = (v[0] + R.yaw) * D, pitch = v[1] * D;
-  const b = R.box, c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+  const b = R.box, c = b.getCenter(V3()), sz = b.getSize(V3());
   const half = Math.tan(camera.fov * D / 2);
-  const rad = Math.max(sz.y / 2 / half, Math.hypot(sz.x, sz.z) / 2 / (half * camera.aspect)) * 0.92 + Math.hypot(sz.x, sz.z) / 2;
+  const rad = Math.max(sz.y / 2 / half, Math.hypot(sz.x, sz.z) / 2 / (half * camera.aspect)) * 1.0 + Math.hypot(sz.x, sz.z) / 2;
   const dist = (spec.dist || 1) * Math.max(2.4, rad);
-  const tgt = c;
-  camera.position.set(tgt.x + dist * Math.sin(yaw) * Math.cos(pitch), tgt.y + dist * Math.sin(pitch), tgt.z + dist * Math.cos(yaw) * Math.cos(pitch));
-  camera.lookAt(tgt);
+  camera.position.set(c.x + dist * Math.sin(yaw) * Math.cos(pitch), c.y + dist * Math.sin(pitch), c.z + dist * Math.cos(yaw) * Math.cos(pitch));
+  camera.lookAt(c);
 }
 
 function draw() {
-  if (!R || !R.el) return;
+  if (!R || !R.el || !R.renderer) return;
   const {renderer, scene, camera, el} = R;
   const w = el.clientWidth, h = el.clientHeight;
   if (!w || !h) return;
@@ -327,9 +511,45 @@ function loop(ts) {
   if (!R.el || !R.el.isConnected) { R.el = null; return; }
   const dt = R.last ? Math.min(60, ts - R.last) : 16; R.last = ts;
   if (R.hold < 0 && !R.reduced) R.t += dt;
-  const k = R.hold >= 0 ? R.hold : R.reduced ? 1 : phaseK(R.t);
+  const k = R.hold >= 0 ? R.hold : R.reduced ? 1 : phaseK(R.t, R.spec.ecc);
   pose(k); draw(); if (R.onPhase) R.onPhase(k);
   R.raf = requestAnimationFrame(loop);
+}
+
+/** Builds the props and the equipment the hands or feet carry. */
+function setup(spec, muscles) {
+  stage();
+  R.spec = spec; R.bal0 = null;
+  clear(R.props); clear(R.tools); for (const c of R.cables) R.scene.remove(c.line); R.cables = [];
+  const pulleys = [];
+  for (const p of spec.props || []) { const g = prop(p); R.props.add(g); if (g.userData.pulley) pulleys.push(g.userData.pulley); }
+  const eq = spec.eq || 'none';
+  const metal = () => mat(COL.metal, 0.4);
+  const add = (o, u) => { o.userData = u; R.tools.add(o); return o; };
+  if (eq === 'bar') add(barbell(spec.barLen || 1.9, spec.plate || 0.225), {kind: 'bar'});
+  if (eq === 'db') for (const s of spec.one ? [spec.one] : ['L', 'R']) add(dumbbell(), {kind: 'db', side: s});
+  if (eq === 'db1') add(dumbbell(), {kind: 'one'});
+  if (eq === 'grip') for (const s of spec.one ? [spec.one] : ['L', 'R']) add(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 10), metal()), {kind: 'grip', side: s});
+  if (eq === 'sled') { const pl = box(0.62, 0.05, 0.5, COL.frame, 0, 0, 0); pl.geometry.rotateX((spec.sledTilt ?? 45) * D); const g = new THREE.Group(); g.add(pl); add(g, {kind: 'sled'}); }
+  if (eq === 'landmine') {
+    const g = new THREE.Group();
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1, 10), mat(COL.metal, 0.35)); g.add(b); add(g, {kind: 'landmine', pivot: spec.pivot});
+    const pl = new THREE.Group(); for (let i = 0; i < 2; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.21 - i * 0.04, 0.21 - i * 0.04, 0.04, 28), mat(COL.plate, 0.7)); c.position.y = i * 0.045; pl.add(c); } add(pl, {kind: 'lmplate'});
+  }
+  if (eq === 'cable' || eq === 'rope' || eq === 'cable1') {
+    if (!pulleys.length) { const t = prop(['tower', spec.tower || {}]); R.props.add(t); pulleys.push(t.userData.pulley); }
+    const sides = eq === 'cable1' ? (spec.one ? [spec.one] : ['L', 'R']) : ['M'];
+    sides.forEach((side, i) => {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const line = new THREE.Line(g, new THREE.LineBasicMaterial({color: 0x2a3142})); R.scene.add(line);
+      R.cables.push({line, side, from: pulleys[Math.min(i, pulleys.length - 1)]});
+    });
+    if (eq !== 'cable1') { const h = new THREE.Mesh(new THREE.CylinderGeometry(eq === 'rope' ? 0.02 : 0.013, eq === 'rope' ? 0.02 : 0.013, eq === 'rope' ? 0.22 : (spec.handle || 0.5), 8), eq === 'rope' ? mat(0x3A4256, 0.9) : metal()); h.rotation.z = Math.PI / 2; const g2 = new THREE.Group(); g2.add(h); add(g2, {kind: 'handle', align: true}); }
+    else for (const s of sides) add(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 10), metal()), {kind: 'grip', side: s});
+  }
+  if (spec.roller) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.42, 16), mat(COL.pad, 0.8)); r.rotation.z = Math.PI / 2; const g = new THREE.Group(); g.add(r); add(g, {kind: 'roller', at: spec.roller.at ?? 0.36, z: spec.roller.z ?? 0.07, side: spec.roller.side}); }
+  for (const pd of spec.pads || []) { const b = box(pd.w, pd.h, pd.d, COL.pad, 0, 0, 0); const g = new THREE.Group(); g.add(b); add(g, {kind: 'pad', frame: pd.frame || 'chest', v: pd.v, rx: pd.rx}); }
+  if (muscles) setMuscles(R.F, muscles);
 }
 
 /**
@@ -339,31 +559,10 @@ function loop(ts) {
 export function mount3d(el, spec, muscles, {reduced = false, onPhase = null} = {}) {
   ensure();
   if (R.el && R.el !== el && R.renderer.domElement.parentNode) R.renderer.domElement.remove();
-  R.el = el; R.spec = spec; R.onPhase = onPhase; R.t = 0; R.last = 0; R.yaw = 0; R.hold = -1; R.reduced = reduced;
+  R.el = el; R.onPhase = onPhase; R.t = 0; R.last = 0; R.yaw = 0; R.hold = -1; R.reduced = reduced;
   el.appendChild(R.renderer.domElement);
   R.renderer.domElement.className = 'gl3d';
-  clear(R.props); clear(R.tools); for (const c of R.cables) R.scene.remove(c.line); R.cables = [];
-  const pulleys = [];
-  for (const p of spec.props || []) { const g = prop(p); R.props.add(g); if (g.userData.pulley) pulleys.push(g.userData.pulley); }
-  const eq = spec.eq || 'none';
-  const metal = () => mat(COL.metal, 0.4);
-  if (eq === 'bar') { const b = barbell(spec.barLen || 1.9, spec.plate || 0.22); b.userData.kind = 'bar'; R.tools.add(b); }
-  if (eq === 'db' || eq === 'dbn') for (const s of spec.one ? ['L'] : ['L', 'R']) { const d = dumbbell(); d.userData = {kind: 'db', side: s, neutral: eq === 'dbn'}; R.tools.add(d); }
-  if (eq === 'db1') { const d = dumbbell(); d.userData.kind = 'one'; R.tools.add(d); }
-  if (eq === 'grip') for (const s of ['L', 'R']) { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 10), metal()); h.userData = {kind: 'grip', side: s}; R.tools.add(h); }
-  if (eq === 'sled') { const pl = box(0.6, 0.05, 0.45, COL.frame, 0, 0, 0); pl.rotation.x = (spec.sledTilt ?? 45) * D; pl.userData.kind = 'sled'; R.tools.add(pl); }
-  if (eq === 'cable' || eq === 'rope' || eq === 'cable1' || eq === 'cable2') {
-    if (!pulleys.length) { const t = prop(['tower', spec.tower || {}]); R.props.add(t); pulleys.push(t.userData.pulley); }
-    const sides = eq === 'cable2' ? ['L', 'R'] : eq === 'cable1' ? ['L'] : ['M'];
-    sides.forEach((side, i) => {
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
-      const line = new THREE.Line(g, new THREE.LineBasicMaterial({color: 0x2a3142})); R.scene.add(line);
-      R.cables.push({line, side, from: pulleys[Math.min(i, pulleys.length - 1)]});
-    });
-    if (eq === 'cable' || eq === 'rope') { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, eq === 'rope' ? 0.2 : (spec.handle || 0.5), 8), metal()); h.rotation.z = Math.PI / 2; h.userData = {kind: 'handle', align: eq === 'cable'}; const g2 = new THREE.Group(); g2.add(h); g2.userData = h.userData; R.tools.add(g2); }
-    if (eq === 'cable1' || eq === 'cable2') for (const s of sides) { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 10), metal()); h.userData = {kind: 'grip', side: s}; R.tools.add(h); }
-  }
-  setMuscles(R.F, muscles);
+  setup(spec, muscles);
   R.box = fitBox(); pose(0); draw();
   if (!R.raf) R.raf = requestAnimationFrame(loop);
   // drag to turn the figure
@@ -375,3 +574,15 @@ export function mount3d(el, spec, muscles, {reduced = false, onPhase = null} = {
 /** Holds a position (0 = start, 1 = end) or resumes the animation (-1). */
 export function hold3d(k) { if (R) { R.hold = k; } }
 export function webglOK() { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; } }
+
+/** Solves one frame without a renderer (tests and tools): reach error, joints and hands in world space. */
+export function solve3d(spec, k) {
+  if (!R || R.spec !== spec) setup(spec, null);
+  pose(k);
+  const {J} = R.F; const w = o => wpos(o).toArray();
+  const joints = {}; for (const n of Object.keys(J)) joints[n] = w(J[n]);
+  const floor = (() => { const b = new THREE.Box3(); R.F.root.updateMatrixWorld(true); b.setFromObject(R.F.root, true); return b.min.y; })();
+  return {err: R.err, joints, hands: [handPos(R.F, 'L').toArray(), handPos(R.F, 'R').toArray()], minY: floor,
+    elbow: ['L', 'R'].map(L => -J['el' + L].rotation.x / D), knee: ['L', 'R'].map(L => J['kn' + L].rotation.x / D)};
+}
+export const _R = () => R; // debugging aid for tools/tests
