@@ -291,7 +291,7 @@ function renderSheet(fresh) {
 let fig3d = null;
 function start3d(el, id) {
   const ex = EX[id]; const m = {}; for (const k in ex.m) m[k] = ex.m[k] >= 1 ? 1 : 0.5;
-  (fig3d ? Promise.resolve(fig3d) : import('./fig3d.js').then(mod => (fig3d = mod))).then(mod => {
+  (fig3d ? Promise.resolve(fig3d) : import('./fig3d.js').then(mod => mod.loadBody().then(() => (fig3d = mod)))).then(mod => {
     if (!el.isConnected) return;
     mod.mount3d(el, POSES3D[id], m, {reduced: REDUCED, onPhase: k => { const t = $('#tag3d'); if (t) { const v = k < 0.5 ? 'Pozycja 1' : 'Pozycja 2'; if (t.textContent !== tt(v)) t.textContent = tt(v); } }});
   }).catch(() => { GL_OK = false; if (UI.sheet && UI.sheet.id === id) { UI.sheet.view = 'ill'; renderSheet(false); } });
@@ -830,7 +830,7 @@ function viewSettings() {
     '<details class="paste"><summary>Wklej dane z poprzedniej wersji</summary><textarea id="pasteData" rows="4" placeholder="Wklej tu skopiowane dane"></textarea><button class="btn sm" data-act="paste-import">Wczytaj</button></details>' +
     (UI.wipe ? '<div class="confirm card"><p>Usunąć wszystkie treningi i ustawienia z tego telefonu?</p><div class="row"><button class="btn sm danger" data-act="wipe-yes">Usuń wszystko</button><button class="btn sm ghost" data-act="wipe-no">Anuluj</button></div></div>' : '<button class="linkbtn danger-link" data-act="wipe">Usuń wszystkie dane</button>') + '</section>';
   h += '<button class="linkcard" data-act="go-know"><span><b>Wiedza</b><span class="muted small" style="display:block">Zasady treningu na masę i źródła</span></span><span aria-hidden="true">›</span></button>';
-  h += '<p class="muted small center">Mój Trener · wersja 2.4</p>';
+  h += '<p class="muted small center">Mój Trener · wersja 2.5</p>';
   return h + '</div>';
 }
 function peStepper(label, f, val, di, i, rest) {

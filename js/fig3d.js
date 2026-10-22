@@ -5,123 +5,93 @@ import * as THREE from './vendor/three.module.min.js';
 
 const D = Math.PI / 180;
 /* Segment lengths (m): upper arm, forearm to wrist, wrist to grip centre; thigh, shin. */
-const ARM = {a: 0.3, f: 0.275, g: 0.05}; ARM.b = ARM.f + ARM.g;
-const LEG = {a: 0.44, b: 0.43};
-const ANKLE_Y = 0.068; // ankle height when the foot is flat on the floor
+const ARM = {a: 0.254, f: 0.262, b: 0.34}; // upper arm, forearm, forearm + grip (set from body.bin)
+const LEG = {a: 0.433, b: 0.448};
+const ANKLE = {y: 0.072}; // ankle height with the foot flat on the floor
 const COL = {body: 0xCBD5E3, shorts: 0x2C3346, shoe: 0x2C3346, hair: 0x3A3F4C, p: 0xFF6A3D, s: 0xFFB08F,
   metal: 0x8C96A8, plate: 0x2F3544, pad: 0x3A4256, frame: 0x6B7487, cable: 0x55607A};
 
-/* ---------- Geometry helpers ---------- */
-/** Tapered limb along -Y from 0 to -len, radius r0 at the top and r1 at the bottom, with rounded ends. */
-function limbGeo(len, r0, r1, bulge = 0.12, seg = 22) {
-  const pts = [];
-  const n = 16;
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const r = r0 + (r1 - r0) * t + bulge * r0 * Math.sin(Math.PI * Math.min(1, t * 1.25));
-    pts.push(new THREE.Vector2(r, -t * len));
-  }
-  // round caps
-  const cap = (y, r, dir) => { const out = []; for (let i = 1; i <= 5; i++) { const a = (i / 5) * Math.PI / 2; out.push(new THREE.Vector2(r * Math.cos(a), y + dir * r * Math.sin(a) * 0.9)); } return out; };
-  const top = cap(0, pts[0].x, 1).reverse(), bot = cap(-len, pts[n].x, -1);
-  const prof = [new THREE.Vector2(0, top.length ? top[0].y : 0), ...top.slice(1), ...pts, ...bot.slice(0, -1), new THREE.Vector2(0, bot[bot.length - 1].y)];
-  const g = new THREE.LatheGeometry(prof.reverse(), seg); // bottom to top keeps the faces pointing outwards
-  g.computeVertexNormals();
-  return g;
-}
-const sphere = (r, sx = 1, sy = 1, sz = 1) => { const g = new THREE.SphereGeometry(r, 24, 16); g.scale(sx, sy, sz); return g; };
+/* ---------- Helpers ---------- */
 const mat = (c, rough = 0.62) => new THREE.MeshStandardMaterial({color: c, roughness: rough, metalness: 0.05});
 
-/* ---------- Mannequin ---------- */
+/* ---------- Body ----------
+ * A rigged human (MakeHuman, CC0) loaded from js/data/body.bin, built by tools/human/build_body.py.
+ * The figure's joints (J) are plain groups that the IK and FK below rotate; the skinned mesh follows them. */
 const MUSCLE_KEYS = ['chest', 'back', 'delts', 'biceps', 'triceps', 'forearms', 'abs', 'glutes', 'quads', 'hams', 'calves'];
-const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-/* Muscle regions on the skin, evaluated per vertex in joint space (front = +z, segment runs along y). */
-const REG = {
-  torso: v => ({chest: ss(0.025, 0.06, v.z) * ss(0.1, 0.14, v.y) * (1 - ss(0.255, 0.285, v.y)) * (1 - ss(0.15, 0.19, Math.abs(v.x))),
-    abs: ss(0.03, 0.07, v.z) * (1 - ss(0.09, 0.13, v.y)) * (1 - ss(0.06, 0.09, Math.abs(v.x))),
-    back: ss(-0.025, -0.06, v.z) * ss(0.0, 0.05, v.y) * (1 - ss(0.3, 0.34, v.y))}),
-  waist: v => ({abs: ss(0.035, 0.07, v.z) * (1 - ss(0.055, 0.085, Math.abs(v.x))) * ss(0.02, 0.06, v.y), back: ss(-0.035, -0.07, v.z) * ss(0.12, 0.2, v.y)}),
-  hips: v => ({glutes: 0.85 * ss(-0.03, -0.075, v.z) * (1 - ss(0.04, 0.08, v.y))}),
-  upper: v => ({delts: 1 - ss(-0.06, -0.095, v.y), biceps: ss(-0.07, -0.1, v.y) * (1 - ss(-0.24, -0.27, v.y)) * ss(0.005, 0.03, v.z),
-    triceps: ss(-0.07, -0.1, v.y) * (1 - ss(-0.25, -0.28, v.y)) * ss(-0.005, -0.03, v.z)}),
-  fore: v => ({forearms: 1 - ss(-0.16, -0.21, v.y)}),
-  thigh: v => ({quads: ss(-0.14, -0.18, v.y) * (1 - ss(-0.37, -0.42, v.y)) * ss(0.0, 0.035, v.z),
-    hams: ss(-0.14, -0.18, v.y) * (1 - ss(-0.36, -0.41, v.y)) * ss(-0.01, -0.045, v.z)}),
-  shin: v => ({calves: ss(-0.03, -0.07, v.y) * (1 - ss(-0.27, -0.33, v.y)) * ss(-0.005, -0.03, v.z)}),
-};
+let BODY = null;
+/** Parses body.bin (see the FORMAT notes in tools/human/build_body.py). */
+export function setBody(buf) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  if (String.fromCharCode(...u8.subarray(0, 4)) !== 'TNMB') throw new Error('body.bin');
+  const ml = dv.getUint32(4, true); const meta = JSON.parse(new TextDecoder().decode(u8.subarray(8, 8 + ml)));
+  let o = 8 + ml; const n = meta.n, t = meta.t;
+  const take = (Type, count) => { const a = new Type(buf.slice(o, o + count * Type.BYTES_PER_ELEMENT)); o += count * Type.BYTES_PER_ELEMENT; return a; };
+  const q = take(Uint16Array, n * 3); const pos = new Float32Array(n * 3);
+  for (let i = 0; i < n * 3; i++) pos[i] = meta.lo[i % 3] + q[i] * meta.q[i % 3];
+  const idx = take(Uint16Array, t * 3); if ((t * 3 * 2) % 4) o += 2;
+  const si = take(Uint8Array, n * 4), sw = take(Uint8Array, n * 4), mus = take(Uint8Array, n * 4), cls = take(Uint8Array, n), cloth = take(Uint8Array, n);
+  BODY = {meta, pos, idx, si, sw, mus, cls, cloth};
+  const L = meta.len;
+  ARM.a = L.armA; ARM.f = L.armF; LEG.a = L.thigh; LEG.b = L.shin; ANKLE.y = L.ankle;
+  GRIP.L.fromArray(meta.gripL); GRIP.R.fromArray(meta.gripR); FOOT_BALL.fromArray(meta.ball);
+  ARM.b = ARM.f + GRIP.L.length();
+  return BODY;
+}
+let _loading = null;
+/** Loads the body once (the app calls this before mounting). */
+export function loadBody(url = new URL('./data/body.bin', import.meta.url)) {
+  if (BODY) return Promise.resolve(BODY);
+  return _loading || (_loading = fetch(url).then(r => { if (!r.ok) throw new Error('body ' + r.status); return r.arrayBuffer(); }).then(setBody));
+}
+
+const PARENT = {pelvis: 'root', spine: 'pelvis', chest: 'spine', neck: 'chest', head: 'neck'};
+for (const s of ['L', 'R']) Object.assign(PARENT, {['sh' + s]: 'chest', ['el' + s]: 'sh' + s, ['hand' + s]: 'el' + s, ['hp' + s]: 'pelvis', ['kn' + s]: 'hp' + s, ['an' + s]: 'kn' + s});
 
 export function buildFigure() {
-  const skin = new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.55, metalness: 0.02});
-  const cloth = new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.85, metalness: 0});
-  const hair = mat(COL.hair, 0.9), shoe = mat(COL.shoe, 0.7);
-  const J = {}, painted = [];
-  /** Adds a mesh; reg = region function, or a muscle key for the whole mesh, or null. */
-  const add = (parent, geo, material, reg = null, base = COL.body, x = 0, y = 0, z = 0) => {
-    const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = true; parent.add(m);
-    if (material.vertexColors) {
-      m.updateMatrix(); const pos = geo.attributes.position, n = pos.count, w = {}; const v = new THREE.Vector3();
-      for (const k of MUSCLE_KEYS) w[k] = null;
-      if (reg) for (let i = 0; i < n; i++) {
-        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrix);
-        const r = typeof reg === 'string' ? {[reg]: 1} : reg(v);
-        for (const k in r) if (r[k] > 0) { (w[k] = w[k] || new Float32Array(n))[i] = r[k]; }
-      }
-      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-      m.userData.paint = {w, base: new THREE.Color(base)}; painted.push(m);
-    }
-    return m;
-  };
-  const xf = (geo, sx, sy, sz, rx = 0) => { if (rx) geo.rotateX(rx); geo.scale(sx, sy, sz); return geo; };
-  const joint = (name, parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); J[name] = g; return g; };
-
-  const root = new THREE.Group(); J.root = root;
-  const pelvis = joint('pelvis', root, 0, 0, 0);
-  add(pelvis, xf(limbGeo(0.2, 0.145, 0.165, 0.05), 1, 1, 0.74), cloth, REG.hips, COL.shorts, 0, 0.08, 0);
-  add(pelvis, sphere(0.085, 1, 1.0, 0.75), cloth, 'glutes', COL.shorts, 0.07, -0.06, -0.068);
-  add(pelvis, sphere(0.085, 1, 1.0, 0.75), cloth, 'glutes', COL.shorts, -0.07, -0.06, -0.068);
-  const spine = joint('spine', pelvis, 0, 0.06, 0);
-  add(spine, xf(limbGeo(0.22, 0.132, 0.142, 0.02), 1, 1, 0.7, Math.PI), skin, REG.waist);
-  const chest = joint('chest', spine, 0, 0.18, 0);
-  add(chest, xf(limbGeo(0.29, 0.145, 0.19, 0.05), 1.08, 1, 0.62, Math.PI), skin, REG.torso);
-  add(chest, sphere(0.088, 1.12, 0.7, 0.3), skin, 'chest', COL.body, 0.074, 0.19, 0.085);
-  add(chest, sphere(0.088, 1.12, 0.7, 0.3), skin, 'chest', COL.body, -0.074, 0.19, 0.085);
-  add(chest, sphere(0.1, 0.85, 1.45, 0.2), skin, 'back', COL.body, 0.085, 0.13, -0.08);
-  add(chest, sphere(0.1, 0.85, 1.45, 0.2), skin, 'back', COL.body, -0.085, 0.13, -0.08);
-  add(chest, sphere(0.09, 1.5, 0.55, 0.45), skin, 'back', COL.body, 0, 0.27, -0.045);
-  const neck = joint('neck', chest, 0, 0.29, 0.005);
-  add(neck, limbGeo(0.09, 0.052, 0.056, 0).rotateX(Math.PI), skin);
-  const head = joint('head', neck, 0, 0.1, 0.01);
-  add(head, sphere(0.1, 0.84, 1.08, 0.98), skin, null, COL.body, 0, 0.05, 0.005);
-  add(head, sphere(0.102, 0.86, 0.66, 0.98), hair, null, 0, 0, 0.095, -0.014);
-  add(head, sphere(0.02, 0.9, 1, 0.9), skin, null, COL.body, 0, 0.04, 0.094);
-  add(head, sphere(0.05, 1.3, 0.75, 1), skin, null, COL.body, 0, -0.025, 0.035);
-  for (const s of [1, -1]) {
-    const L = s > 0 ? 'L' : 'R';
-    const sh = joint('sh' + L, chest, s * 0.205, 0.245, -0.005);
-    add(sh, sphere(0.07, 1.0, 1.1, 1.0), skin, 'delts', COL.body, s * 0.008, -0.025, 0);
-    add(sh, limbGeo(0.3, 0.058, 0.045, 0.06), skin, REG.upper);
-    add(sh, sphere(0.036, 1, 2.1, 0.62), skin, 'biceps', COL.body, 0, -0.155, 0.03);
-    add(sh, sphere(0.038, 1, 2.2, 0.6), skin, 'triceps', COL.body, 0, -0.13, -0.03);
-    const el = joint('el' + L, sh, 0, -ARM.a, 0);
-    add(el, limbGeo(0.27, 0.047, 0.032, 0.1), skin, REG.fore);
-    const hand = joint('hand' + L, el, 0, -ARM.f, 0);
-    add(hand, sphere(0.036, 0.75, 1.25, 1.0), skin, null, COL.body, 0, -0.035, 0.005);
+  const B = BODY, M = B.meta, jp = M.joints, J = {};
+  J.root = new THREE.Group();
+  const wpos = n => (n === 'root' ? jp.pelvis : jp[n]);
+  for (const n of Object.keys(PARENT)) { // insertion order puts parents first
+    const g = new THREE.Group(); const a = wpos(n), b = wpos(PARENT[n]);
+    g.position.set(a[0] - b[0], a[1] - b[1], a[2] - b[2]); J[PARENT[n]].add(g); J[n] = g;
   }
-  for (const s of [1, -1]) {
-    const L = s > 0 ? 'L' : 'R';
-    const hp = joint('hp' + L, pelvis, s * 0.088, -0.05, 0);
-    add(hp, limbGeo(0.16, 0.09, 0.083, 0), cloth, REG.hips, COL.shorts);
-    add(hp, limbGeo(0.44, 0.08, 0.052, 0.06), skin, REG.thigh);
-    add(hp, sphere(0.06, 1.1, 2.7, 0.5), skin, 'quads', COL.body, 0, -0.24, 0.042);
-    add(hp, sphere(0.055, 1.05, 2.6, 0.45), skin, 'hams', COL.body, 0, -0.24, -0.045);
-    const kn = joint('kn' + L, hp, 0, -LEG.a, 0);
-    add(kn, limbGeo(0.43, 0.05, 0.034, 0.06), skin, REG.shin);
-    add(kn, sphere(0.042, 1.05, 2.2, 0.62), skin, 'calves', COL.body, 0, -0.12, -0.03);
-    const an = joint('an' + L, kn, 0, -LEG.b, 0);
-    const foot = add(an, sphere(0.05, 0.85, 0.55, 2.3), shoe, null, 0, 0, -0.04, 0.06);
-    foot.userData.foot = true;
+  for (const s of ['L', 'R']) { // finger pivots: knuckles, then the middle joints
+    const fa = new THREE.Group(); fa.position.fromArray(M['fa' + s]); J['hand' + s].add(fa); J['fa' + s] = fa;
+    const fb = new THREE.Group(); fb.position.fromArray(M['fb' + s]).sub(fa.position); fa.add(fb); J['fb' + s] = fb;
   }
-  return {root, J, painted};
+  const bones = [], inv = [];
+  for (const b of M.bones) {
+    const bone = new THREE.Bone(); bone.quaternion.fromArray(b.q); bone.name = b.name;
+    (J[b.name.startsWith('fa') || b.name.startsWith('fb') ? b.name : b.joint]).add(bone);
+    bones.push(bone); inv.push(new THREE.Matrix4().makeTranslation(-b.bind[0], -b.bind[1], -b.bind[2]));
+    if (b.name.startsWith('el2')) J['tw' + b.name.slice(3)] = Object.assign(bone, {q0: bone.quaternion.clone()});
+  }
+  // trainers over the feet: a rounded upper and a light sole
+  for (const s of ['L', 'R']) {
+    const up = new THREE.SphereGeometry(1, 28, 18); const p = up.attributes.position;
+    for (let i = 0; i < p.count; i++) { let x = p.getX(i) * 0.047, y = p.getY(i) * 0.052, z = p.getZ(i) * 0.148; if (z > 0.05) y *= 1 - (z - 0.05) * 2.6; y = Math.max(y, -0.036); p.setXYZ(i, x, y - 0.03, z + 0.07); }
+    up.computeVertexNormals();
+    const shoe = new THREE.Mesh(up, mat(COL.shoe, 0.7)); shoe.castShadow = true;
+    const sole = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.018, 28), mat(0xE4E8EF, 0.8)); sole.scale.set(0.05, 1, 0.152); sole.position.set(0, -0.062, 0.07); sole.castShadow = true;
+    shoe.rotation.y = s === 'L' ? 0.06 : -0.06; sole.rotation.y = shoe.rotation.y;
+    J['an' + s].add(shoe, sole);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(B.pos, 3));
+  g.setIndex(new THREE.BufferAttribute(B.idx, 1));
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array(B.si), 4));
+  const w = new Float32Array(B.sw.length); for (let i = 0; i < w.length; i++) w[i] = B.sw[i] / 255;
+  g.setAttribute('skinWeight', new THREE.BufferAttribute(w, 4));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(M.n * 3), 3));
+  g.computeVertexNormals();
+  const mesh = new THREE.SkinnedMesh(g, new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.62, metalness: 0.02}));
+  mesh.castShadow = true; mesh.frustumCulled = false;
+  J.root.updateMatrixWorld(true);
+  mesh.bind(new THREE.Skeleton(bones, inv), new THREE.Matrix4());
+  // trunk vertices sampled for "lying on the floor" checks
+  const trunk = []; const tb = new Set(M.bones.map((b, i) => (['pelvis', 'spine', 'chest', 'neck', 'head'].includes(b.name) ? i : -1)).filter(i => i >= 0));
+  for (let i = 0; i < M.n; i += 5) if (tb.has(B.si[i * 4]) && B.sw[i * 4] > 160) trunk.push(i);
+  return {root: J.root, J, mesh, trunk};
 }
 
 /* ---------- Equipment ---------- */
@@ -225,7 +195,7 @@ function apply(F, p) {
   [['L', 1, 0], ['R', -1, 1]].forEach(([L, s, i]) => {
     const sh = J['sh' + L]; sh.rotation.order = 'ZXY'; sh.rotation.set(-sf[i] * D, s * sr[i] * D, s * sa[i] * D);
     J['el' + L].rotation.set(-el[i] * D, 0, 0);
-    J['hand' + L].rotation.set((p.wr || 0) * D, 0, 0);
+    J['hand' + L].rotation.set((p.wr || 0) * D, J['hand' + L].rotation.y, 0);
     const hp = J['hp' + L]; hp.rotation.order = 'ZXY'; hp.rotation.set(-hf[i] * D, 0, s * ha[i] * D);
     J['kn' + L].rotation.set(kn[i] * D, 0, 0);
     J['an' + L].rotation.set(-an[i] * D, 0, 0);
@@ -235,6 +205,7 @@ function apply(F, p) {
 /* ---------- IK ---------- */
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const _m4 = new THREE.Matrix4(), _q1 = new THREE.Quaternion(), _e = new THREE.Euler();
+const AX = {x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1)};
 const wpos = o => { o.updateWorldMatrix(true, false); return o.getWorldPosition(V3()); };
 const wquat = o => { o.updateWorldMatrix(true, false); return o.getWorldQuaternion(new THREE.Quaternion()); };
 /** Points j1 (upper joint) and bends j2 so the end of the chain reaches T, bending towards the pole.
@@ -263,9 +234,10 @@ function twoBone(j1, j2, a, b, T, pole, arm) {
   j1.updateWorldMatrix(false, true);
   return Math.max(0, L0 - (a + b));
 }
-const FOOT_BALL = V3(0, -0.062, 0.125); // ball of the foot in ankle space
+const FOOT_BALL = V3(0.01, -0.068, 0.139); // ball of the foot in ankle space
+const GRIP = {L: V3(-0.035, -0.067, 0), R: V3(0.035, -0.067, 0)}; // grip point in hand space
 const footQ = (yaw, pitch) => new THREE.Quaternion().setFromEuler(_e.set(pitch * D, yaw * D, 0, 'YXZ'));
-const handPos = (F, L) => F.J['hand' + L].localToWorld(V3(0, -ARM.g, 0.01));
+const handPos = (F, L) => F.J['hand' + L].localToWorld(GRIP[L].clone());
 const SIDES = [['L', 1, 0], ['R', -1, 1]];
 const pick = (v, i) => (isPair(v) ? v[i] : v);
 const num = (v, i, d) => { const x = Array.isArray(v) ? v[i] : v; return x == null ? d : x; };
@@ -275,7 +247,7 @@ let R = null; // shared state: one figure, one renderer
 function stage() {
   if (R) return R;
   const scene = new THREE.Scene();
-  const F = buildFigure(); scene.add(F.root);
+  const F = buildFigure(); scene.add(F.root, F.mesh);
   R = {scene, F, props: new THREE.Group(), tools: new THREE.Group(), cables: [], spec: null, t: 0, last: 0, raf: 0, el: null, yaw: 0, drag: null, hold: -1, err: 0};
   scene.add(R.props, R.tools);
   return R;
@@ -300,17 +272,26 @@ function ensure() {
 }
 
 const _c = new THREE.Color(), _p = new THREE.Color(COL.p), _s = new THREE.Color(COL.s);
+const _sh = new THREE.Color(COL.shorts), _shoe = new THREE.Color(COL.shoe), _eye = new THREE.Color(0xAEB7C6), _hair = new THREE.Color(COL.hair), _k = new THREE.Color();
+/** Colours the skin: main muscles orange, assisting ones light, plus shorts, shoes, hair and eyes. m = {key: 1 | 0.5}. */
 export function setMuscles(F, m) {
-  for (const mesh of F.painted) {
-    const {w, base} = mesh.userData.paint; const col = mesh.geometry.attributes.color; const n = col.count;
-    for (let i = 0; i < n; i++) {
-      _c.copy(base); let best = 0, lv = 0;
-      for (const k of MUSCLE_KEYS) { const a = w[k]; if (!a || !m[k]) continue; const x = a[i]; if (x > best || (x === best && m[k] > lv)) { best = x; lv = m[k]; } }
-      if (best > 0) _c.lerp(lv >= 1 ? _p : _s, best);
-      col.setXYZ(i, _c.r, _c.g, _c.b);
+  const {mus, cls, cloth, meta} = BODY; const col = F.mesh.geometry.attributes.color; const base = new THREE.Color(COL.body);
+  const lv = meta.muscles.map(k => (m && m[k]) || 0);
+  for (let i = 0; i < meta.n; i++) {
+    const c = cls[i];
+    if (c === 3) { col.setXYZ(i, _eye.r, _eye.g, _eye.b); continue; }
+    let best = 0, l = 0;
+    for (const o of [0, 2]) { const k = mus[i * 4 + o], w = mus[i * 4 + o + 1] / 255; if (lv[k] && w > best) { best = w; l = lv[k]; } }
+    const mc = l >= 1 ? _p : _s;
+    _c.copy(base).lerp(mc, best);
+    if (c) {
+      _k.copy(c === 1 ? _sh : c === 2 ? _shoe : _hair);
+      if (c === 1) _k.lerp(mc, best * 0.9);
+      _c.lerp(_k, cloth[i] / 255);
     }
-    col.needsUpdate = true;
+    col.setXYZ(i, _c.r, _c.g, _c.b);
   }
+  col.needsUpdate = true;
 }
 
 function clear(g) { while (g.children.length) { const c = g.children.pop(); c.traverse(o => { if (o.geometry) o.geometry.dispose(); }); } }
@@ -342,8 +323,8 @@ function target(K, i, s, g) {
     if (key === 'hw') return {p};
     if (key === 'hc') return {p: J.chest.localToWorld(p)};
     if (key === 'hp') return {p: J.pelvis.localToWorld(p)};
-    if (key === 'hs') return {p: wpos(J['sh' + L]).add(p)};
-    return {d: p.normalize(), r: num(K.hr, i, ARM.a + ARM.b - 0.02)};
+    if (key === 'hs') { const r = ARM.a + ARM.b - 0.012; if (p.length() > r) p.setLength(r); return {p: wpos(J['sh' + L]).add(p)}; } // too far = arm straight that way
+    return {d: p.normalize(), r: Math.min(num(K.hr, i, 9), ARM.a + ARM.b - 0.015)};
   }
   return null;
 }
@@ -358,13 +339,33 @@ function handTargets(spec, k, p) {
     return pa.lerp(pb, t);
   });
 }
+/** Palm turn (pr: 90 palm forward / supinated, 0 neutral, -90 pronated) shared by the hand and half the forearm,
+ * and the fingers curled round a handle. */
+const _ax = new THREE.Vector3(), _q2 = new THREE.Quaternion();
+function hands(spec, p) {
+  const {J} = R.F; const eq = spec.eq || 'none';
+  const pr = p.pr ?? spec.pr ?? (['bar', 'landmine'].includes(eq) || (eq === 'cable' && (spec.handle || 0.5) > 0.3) ? -90 : 0);
+  const curl = (spec.curl ?? (eq === 'none' && !spec.props ? 12 : 82)) * D;
+  SIDES.forEach(([L, s, i]) => {
+    const a = num(pr, i, 0) * D * s; const h = J['hand' + L];
+    h.rotation.order = 'YXZ'; h.rotation.y = a;
+    const tw = J['tw' + L]; tw.quaternion.copy(_q2.setFromAxisAngle(AX.y, a / 2)).multiply(tw.q0);
+    const n = V3().fromArray(BODY.meta['palm' + L]); _ax.crossVectors(V3(0, -1, 0), n).normalize();
+    J['fa' + L].quaternion.setFromAxisAngle(_ax, curl * 0.6); J['fb' + L].quaternion.setFromAxisAngle(_ax, curl * 0.8);
+  });
+}
 function solveArms(spec, p, T) {
-  const {J} = R.F; const ep = p.ep ?? spec.ep ?? [1, -0.6, -0.3]; const cq = wquat(J.chest); let err = 0;
+  const {J, root} = R.F; const ep = p.ep ?? spec.ep ?? [1, -0.6, -0.3]; const cq = wquat(J.chest); let err = 0;
   SIDES.forEach(([L, s, i]) => {
     if (!T[i]) return;
-    const e = Array.isArray(ep[0]) ? ep[i] : ep;
-    J['hand' + L].rotation.set(0, 0, 0);
-    err = Math.max(err, twoBone(J['sh' + L], J['el' + L], ARM.a, ARM.b, T[i], V3(s * e[0], e[1], e[2]).applyQuaternion(cq), true));
+    const e = Array.isArray(ep[0]) ? ep[i] : ep; const pole = V3(s * e[0], e[1], e[2]).applyQuaternion(cq);
+    J['hand' + L].rotation.x = (p.wr || 0) * D; J['hand' + L].rotation.z = 0;
+    let goal = T[i].clone(), miss = 0;
+    for (let it = 0; it < 3; it++) { // the grip sits beside the forearm axis: aim off by the remaining miss
+      miss = twoBone(J['sh' + L], J['el' + L], ARM.a, ARM.b, goal, pole, true);
+      root.updateMatrixWorld(true); const d = T[i].clone().sub(handPos(R.F, L)); if (d.lengthSq() < 1e-6) break; goal.add(d);
+    }
+    err = Math.max(err, miss, handPos(R.F, L).distanceTo(T[i]) > 0.03 ? handPos(R.F, L).distanceTo(T[i]) : 0);
   });
   return err;
 }
@@ -375,7 +376,7 @@ function feetFrame(spec, p) {
   const f = spec.feet; const r = p.root || DEF.root;
   return SIDES.map(([L, s, i]) => {
     const yaw = (r[4] || 0) + s * num(p.ftoe, i, f.toe ?? 12), q = footQ(yaw, num(p.fp, i, 0));
-    const pt = V3(s * num(p.fx, i, f.w ?? 0.14), num(p.fy, i, f.y ?? (num(f.ball, i, false) ? 0.02 : ANKLE_Y)), num(p.fz, i, f.z ?? 0));
+    const pt = V3(s * num(p.fx, i, f.w ?? 0.14), num(p.fy, i, f.y ?? (num(f.ball, i, false) ? 0.02 : ANKLE.y)), num(p.fz, i, f.z ?? 0));
     if (num(f.ball, i, false)) pt.sub(FOOT_BALL.clone().applyQuaternion(q));
     return {pt, q};
   });
@@ -401,7 +402,7 @@ function pose(k) {
   }
   const [K0, K1, t] = segment(spec, k);
   const p = mix(K0, K1, t);
-  apply(F, p); F.root.updateMatrixWorld(true);
+  apply(F, p); hands(spec, p); F.root.updateMatrixWorld(true);
   if (spec.pin) { const fr = spec.pin.f === 'p' ? J.pelvis : J.chest; shift(F, V3(...spec.pin.w).sub(fr.localToWorld(V3(...spec.pin.v)))); }
   if (spec.rest != null) shift(F, V3(0, spec.rest - trunkFloor(F), 0)); // lying on the floor: the back rests on it
   const ft = spec.feet ? feetFrame(spec, p) : null;
@@ -434,20 +435,17 @@ const _b = new THREE.Box3(), _tv = new THREE.Vector3();
 /** Lowest skin point of the trunk and head (meshes on pelvis, spine, chest, neck, head). */
 function trunkFloor(F) {
   F.root.updateMatrixWorld(true); let min = Infinity;
-  for (const n of ['pelvis', 'spine', 'chest', 'neck', 'head']) for (const m of F.J[n].children) {
-    if (!m.isMesh) continue; const pos = m.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i += 2) { _tv.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); if (_tv.y < min) min = _tv.y; }
-  }
+  for (const i of F.trunk) { F.mesh.getVertexPosition(i, _tv); if (_tv.y < min) min = _tv.y; }
   return min;
 }
-/** Lowest point of the feet in world space. */
+const SOLE = [V3(0, -0.07, -0.05), V3(0, -0.068, 0.14), V3(0, -0.06, 0.2)];
+/** Lowest point of the soles in world space. */
 function footFloor(F) {
   let min = Infinity;
   F.root.updateMatrixWorld(true);
-  F.root.traverse(o => { if (o.userData.foot) { _b.setFromObject(o); min = Math.min(min, _b.min.y); } });
+  for (const L of ['L', 'R']) for (const p of SOLE) min = Math.min(min, F.J['an' + L].localToWorld(p.clone()).y);
   return min;
 }
-const AX = {x: V3(1, 0, 0), y: V3(0, 1, 0), z: V3(0, 0, 1)};
 function placeTools(F, spec) {
   const J = F.J; const hl = handPos(F, 'L'), hr = handPos(F, 'R');
   const dba = spec.dba || 'cx', fr = s => (dba[0] === 'c' ? J.chest : J['hand' + s]);
@@ -480,7 +478,7 @@ function placeTools(F, spec) {
 /** Box around the figure, its props and tools over the whole movement. */
 function fitBox() {
   const box = new THREE.Box3();
-  for (const k of [0, 0.25, 0.5, 0.75, 1]) { pose(k); R.scene.updateMatrixWorld(true); box.expandByObject(R.F.root); box.expandByObject(R.tools); }
+  for (const k of [0, 0.25, 0.5, 0.75, 1]) { pose(k); R.scene.updateMatrixWorld(true); R.F.mesh.computeBoundingBox(); box.union(R.F.mesh.boundingBox); box.expandByObject(R.tools); for (const L of ['L', 'R']) box.expandByPoint(R.F.J['an' + L].localToWorld(V3(0, -0.07, 0.2))); }
   box.expandByObject(R.props);
   return box;
 }
@@ -488,7 +486,7 @@ function frameCamera() {
   const {camera, spec} = R;
   const v = spec.view || [35, 12];
   const yaw = (v[0] + R.yaw) * D, pitch = v[1] * D;
-  const b = R.box, c = b.getCenter(V3()), sz = b.getSize(V3());
+  const b = R.box, c = spec.look ? V3(...spec.look) : b.getCenter(V3()), sz = b.getSize(V3());
   const half = Math.tan(camera.fov * D / 2);
   const rad = Math.max(sz.y / 2 / half, Math.hypot(sz.x, sz.z) / 2 / (half * camera.aspect)) * 1.0 + Math.hypot(sz.x, sz.z) / 2;
   const dist = (spec.dist || 1) * Math.max(2.4, rad);
@@ -581,7 +579,7 @@ export function solve3d(spec, k) {
   pose(k);
   const {J} = R.F; const w = o => wpos(o).toArray();
   const joints = {}; for (const n of Object.keys(J)) joints[n] = w(J[n]);
-  const floor = (() => { const b = new THREE.Box3(); R.F.root.updateMatrixWorld(true); b.setFromObject(R.F.root, true); return b.min.y; })();
+  const floor = (() => { const b = new THREE.Box3(); R.F.root.updateMatrixWorld(true); b.setFromObject(R.F.mesh, true); return b.min.y; })();
   return {err: R.err, joints, hands: [handPos(R.F, 'L').toArray(), handPos(R.F, 'R').toArray()], minY: floor,
     elbow: ['L', 'R'].map(L => -J['el' + L].rotation.x / D), knee: ['L', 'R'].map(L => J['kn' + L].rotation.x / D)};
 }

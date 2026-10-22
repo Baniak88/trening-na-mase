@@ -1,7 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 
-const {solve3d} = await import('../js/fig3d.js');
+const {solve3d, setBody} = await import('../js/fig3d.js');
+const {readFileSync} = await import('node:fs');
+const bin = readFileSync(new URL('../js/data/body.bin', import.meta.url)); setBody(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.length));
 const {POSES} = await import('../js/data/poses3d.js');
 const {EX} = await import('../js/data/catalog.js');
 
