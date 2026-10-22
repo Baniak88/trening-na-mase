@@ -31,3 +31,6 @@ Własny plan z `week: true` ma dni z `wd` (0 = poniedziałek) i `mus` (partie). 
 
 ## Trener AI
 `js/ai.js`: dostawcy (`PROVIDERS`), `ask()` (fetch prosto z telefonu, klucz użytkownika), `buildSystem()` (kontekst: plan, treningi, regeneracja, lista ćwiczeń), `parsePlan()` (blok ```plan z JSON). Klucz i czat w `S.ai` i `S.chat`, poza `exportJSON`.
+
+## Animacje 3D
+`js/fig3d.js` (three.js z `js/vendor/`, ładowany dopiero przy otwarciu karty): własny manekin z brył obrotowych, mięśnie kolorowane wierzchołkami (`setMuscles` z `ex.m`), sprzęt z `prop()`. Pozy w `js/data/poses3d.js`: `POSES[id] = {A, B, eq, props, view, hands}`, kąty stawów w stopniach (domyślne w `DEF`), `SAME` = aliasy wariantów. Ćwiczenie z wpisem w `POSES` dostaje widok „3D” jako domyślny; bez WebGL zostaje rysunek.
