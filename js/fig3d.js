@@ -129,9 +129,12 @@ function plateMesh(r, t) {
   const hub = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, t + 0.004, 24), m.chrome)); hub.rotation.z = Math.PI / 2; g.add(hub);
   return g;
 }
-function barbell(len = 1.9, pr = 0.22) {
+function barbell(len = 1.9, pr = 0.22, ez = false) {
   const m = mats(); const g = new THREE.Group(); const h = len / 2;
-  const shaft = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.0135, 0.0135, len - 0.8, 16), m.knurl)); shaft.rotation.z = Math.PI / 2; g.add(shaft);
+  if (ez) { // cambered EZ shaft, crossing the straight line at the grips (±0.16)
+    const c = h - 0.4, P = [[0, 0], [0.06, 0], [0.12, 0.035], [0.2, -0.035], [0.26, 0], [c, 0]].filter(([x]) => x <= c);
+    for (const s of [1, -1]) for (let i = 1; i < P.length; i++) g.add(tube([s * P[i - 1][0], 0, P[i - 1][1]], [s * P[i][0], 0, P[i][1]], 0.0135, m.knurl, 12));
+  } else { const shaft = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.0135, 0.0135, len - 0.8, 16), m.knurl)); shaft.rotation.z = Math.PI / 2; g.add(shaft); }
   for (const s of [1, -1]) {
     const sl = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.42, 20), m.chrome)); sl.rotation.z = Math.PI / 2; sl.position.x = s * (h - 0.2); g.add(sl);
     const col = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.035, 20), m.chrome)); col.rotation.z = Math.PI / 2; col.position.x = s * (h - 0.4); g.add(col);
@@ -184,7 +187,7 @@ function prop(p) {
       g.add(rbox(0.06, 0.05, 0.12, m.steel, 0, y + bh * 0.55, bz - 0.04, 0.01));
     }
   } else if (t === 'box') { // plyo box / step
-    const h = a.h || 0.4; g.add(rbox(a.w || 0.4, h, a.d || 0.4, a.c ? new THREE.MeshStandardMaterial({color: a.c, roughness: 0.7}) : m.rubber, a.x || 0, a.y ?? h / 2, a.z || 0, 0.02));
+    const h = a.h || 0.4; g.add(rbox(a.w || 0.4, h, a.d || 0.4, a.c ? new THREE.MeshStandardMaterial({color: a.c, roughness: 0.7}) : a.steel ? m.steel : m.rubber, a.x || 0, a.y ?? h / 2, a.z || 0, a.steel ? 0.012 : 0.02));
   } else if (t === 'bar') { // pull-up station
     const y = a.y || 2.3, z = a.z || 0;
     g.add(tube([-0.72, y, z], [0.72, y, z], 0.016, m.knurl, 18));
@@ -210,13 +213,15 @@ function prop(p) {
     g.userData.pulley = new THREE.Vector3(x, y, z);
   } else if (t === 'pad') { // free pad, optionally tilted
     const b = rbox(a.w || 0.3, a.h || 0.08, a.d || 0.4, a.c ? new THREE.MeshStandardMaterial({color: a.c, roughness: 0.7}) : m.pad, a.x || 0, a.y || 0.5, a.z || 0, 0.025); b.rotation.x = (a.rx || 0) * D; g.add(b);
+    if (a.stem) { const x = a.x || 0, y = a.y || 0.5, z = a.z || 0, e = z + a.stem; g.add(tube([x, y, z], [x, y, e], 0.035, m.steel), tube([x, y + 0.03, e], [x, 0, e], 0.04, m.steel), rbox(0.5, 0.045, 0.1, m.steel, x, 0.0225, e, 0.012)); }
+    if (a.post) for (const s of [1, -1]) { const x = (a.x || 0) + s * ((a.w || 0.3) / 2 + 0.03); g.add(tube([x, a.y || 0.5, a.z || 0], [x, 0, a.z || 0], 0.028, m.steel), rbox(0.08, 0.04, 0.4, m.steel, x, 0.02, a.z || 0, 0.01)); }
   } else if (t === 'plate') { // platform (hack squat, footplate)
     const b = rbox(a.w || 0.6, a.h || 0.05, a.d || 0.45, m.steel, a.x || 0, a.y || 0.03, a.z || 0, 0.012); b.rotation.x = (a.rx || 0) * D; g.add(b);
     const top = rbox((a.w || 0.6) - 0.04, 0.012, (a.d || 0.45) - 0.04, m.rubber, 0, (a.h || 0.05) / 2, 0, 0.004); b.add(top);
   } else if (t === 'rails') { // Smith machine / hack rails
-    const w = a.w || 0.75, z = a.z || -0.05;
-    for (const s of [1, -1]) { g.add(rbox(0.07, 2.2, 0.07, m.steel, s * w, 1.1, z, 0.012)); g.add(tube([s * (w - 0.06), 0.1, z + 0.05], [s * (w - 0.06), 2.05, z + 0.05], 0.012, m.chrome, 10)); g.add(rbox(0.08, 0.045, 0.8, m.steel, s * w, 0.0225, z, 0.012)); }
-    g.add(rbox(w * 2 + 0.07, 0.07, 0.07, m.steel, 0, 2.2, z, 0.012));
+    const w = a.w || 0.75, z = a.z ?? -0.05;
+    for (const s of [1, -1]) { g.add(rbox(0.07, 2.2, 0.07, m.steel, s * (w + 0.02), 1.1, z - 0.06, 0.012)); g.add(tube([s * w, 0.08, z], [s * w, 2.1, z], 0.014, m.chrome, 10)); for (const y of [0.08, 2.1]) g.add(rbox(0.05, 0.03, 0.08, m.steel, s * w, y, z - 0.03, 0.006)); g.add(rbox(0.08, 0.045, 0.8, m.steel, s * (w + 0.02), 0.0225, z - 0.06, 0.012)); }
+    g.add(rbox(w * 2 + 0.11, 0.07, 0.07, m.steel, 0, 2.2, z - 0.06, 0.012));
   }
   return g;
 }
@@ -525,8 +530,19 @@ function placeTools(F, spec) {
     }
     else if (u.kind === 'handle') { o.position.copy(hl).add(hr).multiplyScalar(0.5); if (u.align) o.quaternion.setFromUnitVectors(AX.x, hl.clone().sub(hr).normalize()); }
     else if (u.kind === 'grip') { o.position.copy(u.side === 'L' ? hl : hr); }
+    else if (u.kind === 'lever') {
+      const H = (u.side === 'L' ? hl : hr).clone(), sg = u.side === 'L' ? 1 : -1, [main, stub, ax] = o.children;
+      if (u.axis) { const O = H.clone().add(V3(0, 0.08, 0)), Q = V3(u.P.x, O.y, u.P.z); span(stub, H, O); span(main, O, Q); span(ax, Q, u.P); }
+      else { const O = H.clone().add(V3(sg * u.stub, 0, 0)); span(stub, H, O); span(main, O, u.P); ax.scale.set(0, 0, 0); }
+    }
     else if (u.kind === 'sled') { const sp = spec.sledBall || (spec.feet && spec.feet.ball) ? V3(0, -0.075, 0.125) : V3(0, -0.075, 0.06); const fl = J.anL.localToWorld(sp.clone()), fr2 = J.anR.localToWorld(sp); o.position.copy(fl).add(fr2).multiplyScalar(0.5); }
     else if (u.kind === 'roller') { const a = J.knL.localToWorld(V3(0, -u.at, u.z)), b = J.knR.localToWorld(V3(0, -u.at, u.z)); o.position.copy(u.side === 'L' ? a : u.side === 'R' ? b : a.add(b).multiplyScalar(0.5)); }
+    else if (u.kind === 'rollarm') {
+      const kn = u.side === 'R' ? wpos(J.knR) : u.side === 'L' ? wpos(J.knL) : wpos(J.knL).add(wpos(J.knR)).multiplyScalar(0.5);
+      const kq = u.side === 'R' ? J.knR : J.knL, e = kq.localToWorld(V3(0, -u.at, u.z)); const x = (u.side ? kn.x : 0) + 0.26;
+      e.x = x; const k2 = V3(x, kn.y, kn.z); span(o.children[0], k2, e); o.children[1].position.copy(k2); o.children[1].quaternion.setFromUnitVectors(AX.y, AX.x);
+    }
+    else if (u.kind === 'padpost') { const P = J[u.frame].localToWorld(V3(...u.v)); P.x += u.dx; span(o.children[0], P, V3(P.x, 0, P.z)); }
     else if (u.kind === 'pad') { o.position.copy(J[u.frame].localToWorld(V3(...u.v))); o.quaternion.copy(wquat(J[u.frame])).multiply(new THREE.Quaternion().setFromEuler(_e.set((u.rx || 0) * D, 0, 0))); }
     else if (u.kind === 'landmine') {
       const piv = V3(...u.pivot), h = hl.clone().add(hr).multiplyScalar(0.5); const dir = h.clone().sub(piv); const len = dir.length() + 0.25; dir.normalize();
@@ -589,7 +605,8 @@ function setup(spec, muscles) {
   const eq = spec.eq || 'none';
   const m = mats(); const metal = () => m.knurl;
   const add = (o, u) => { o.userData = u; R.tools.add(o); return o; };
-  if (eq === 'bar') add(barbell(spec.barLen || 1.9, spec.plate || 0.225), {kind: 'bar'});
+  if (eq === 'bar') { const bb = add(barbell(spec.barLen || 1.9, spec.plate || 0.225, spec.ez), {kind: 'bar'}); const rl = (spec.props || []).find(p => p[0] === 'rails');
+    if (rl) for (const sg of [1, -1]) bb.add(rbox(0.05, 0.1, 0.06, m.chrome, sg * ((rl[1] || {}).w || 0.75), 0, 0, 0.012)); }
   if (eq === 'db') for (const s of spec.one ? [spec.one] : ['L', 'R']) add(dumbbell(), {kind: 'db', side: s});
   if (eq === 'db1') add(dumbbell(), {kind: 'one'});
   if (eq === 'grip') for (const s of spec.one ? [spec.one] : ['L', 'R']) add(shade(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 16), metal())), {kind: 'grip', side: s});
@@ -610,10 +627,60 @@ function setup(spec, muscles) {
     if (eq !== 'cable1') { const h = shade(new THREE.Mesh(new THREE.CylinderGeometry(eq === 'rope' ? 0.02 : 0.014, eq === 'rope' ? 0.02 : 0.014, eq === 'rope' ? 0.22 : (spec.handle || 0.5), 14), eq === 'rope' ? m.rubber : metal())); h.rotation.z = Math.PI / 2; const g2 = new THREE.Group(); g2.add(h); add(g2, {kind: 'handle', align: true}); }
     else for (const s of sides) add(shade(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 16), metal())), {kind: 'grip', side: s});
   }
-  if (spec.roller) { const r = shade(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.33, 6, 20), m.pad)); r.rotation.z = Math.PI / 2; const g = new THREE.Group(); g.add(r, tube([-0.24, 0, 0], [0.24, 0, 0], 0.012, m.chrome)); add(g, {kind: 'roller', at: spec.roller.at ?? 0.36, z: spec.roller.z ?? 0.07, side: spec.roller.side}); }
-  for (const pd of spec.pads || []) { const b = rbox(pd.w, pd.h, pd.d, m.pad, 0, 0, 0, 0.025); const g = new THREE.Group(); g.add(b); add(g, {kind: 'pad', frame: pd.frame || 'chest', v: pd.v, rx: pd.rx}); }
+  if (spec.roller) { const r = shade(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.33, 6, 20), m.pad)); r.rotation.z = Math.PI / 2; const g = new THREE.Group(); g.add(r, tube([-0.24, 0, 0], [0.24, 0, 0], 0.012, m.chrome)); add(g, {kind: 'roller', at: spec.roller.at ?? 0.36, z: spec.roller.z ?? 0.07, side: spec.roller.side}); 
+    const arm = new THREE.Group(); arm.add(shade(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 14), m.steel)), shade(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.07, 18), m.chrome)));
+    add(arm, {kind: 'rollarm', at: spec.roller.at ?? 0.36, z: spec.roller.z ?? 0.07, side: spec.roller.side});
+  }
+  for (const pd of spec.pads || []) { const b = rbox(pd.w, pd.h, pd.d, m.pad, 0, 0, 0, 0.025); const g = new THREE.Group(); g.add(b); add(g, {kind: 'pad', frame: pd.frame || 'chest', v: pd.v, rx: pd.rx}); if (pd.post) for (const sg of [1, -1]) { const t = new THREE.Group(); t.add(shade(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 1, 12), m.steel))); add(t, {kind: 'padpost', frame: pd.frame || 'chest', v: pd.v, dx: sg * (pd.w / 2 + 0.035)}); } }
   if (eq === 'sled') sledRails(spec, m);
+  if (spec.track) trackRails(spec.track, m);
+  if (spec.lever) machineArms(spec, m);
+  if (spec.roller) { // knee-axis bracket to the seat or bench
+    pose(0); const {J} = R.F, sd = spec.roller.side, kn = sd === 'R' ? wpos(J.knR) : sd === 'L' ? wpos(J.knL) : wpos(J.knL).add(wpos(J.knR)).multiplyScalar(0.5);
+    const x = (sd ? kn.x : 0) + 0.26, a = [x, kn.y, kn.z], c = [x, kn.y - 0.13, kn.z - 0.22];
+    R.props.add(tube(a, c, 0.025, m.steel), tube(c, [0.05, c[1], c[2]], 0.025, m.steel));
+  }
   if (muscles) setMuscles(R.F, muscles);
+}
+/** Machine lever arms from the handles to a fixed pivot, so a machine press or fly reads as a machine.
+ * lever {d: direction from the hands' mid path to the pivot (x mirrored per side), len, stub: outward offset of
+ * the arm from the hand, axis: rise above the shoulder (pec deck: arm turns about a vertical axis), zb: frame depth}. */
+function machineArms(spec, m) {
+  const L = spec.lever, sides = spec.one ? [spec.one] : ['L', 'R'], g = new THREE.Group();
+  pose(0); const h0 = {L: handPos(R.F, 'L'), R: handPos(R.F, 'R')}, sh = {L: wpos(R.F.J.shL), R: wpos(R.F.J.shR)};
+  pose(1); const h1 = {L: handPos(R.F, 'L'), R: handPos(R.F, 'R')};
+  for (const s of sides) {
+    const sg = s === 'L' ? 1 : -1; let P;
+    if (L.axis) P = sh[s].clone().add(V3(sg * (L.ax || 0), L.axis, L.az || 0));
+    else { const d = V3(sg * L.d[0], L.d[1], L.d[2]).normalize(); P = h0[s].clone().add(h1[s]).multiplyScalar(0.5).addScaledVector(d, L.len || 0.7); P.x += sg * (L.stub ?? 0.13); }
+    const zb = L.zb ?? -0.5;
+    g.add(shade(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.09, 18), m.chrome)).translateX(P.x).translateY(P.y).translateZ(P.z).rotateZ(Math.PI / 2));
+    g.add(tube([P.x, P.y, P.z], [P.x, P.y, zb], 0.035, m.steel), tube([P.x, P.y + 0.03, zb], [P.x, 0, zb], 0.04, m.steel), rbox(0.1, 0.045, 0.5, m.steel, P.x, 0.0225, zb, 0.012));
+    const arm = new THREE.Group(); arm.userData = {kind: 'lever', side: s, P, axis: !!L.axis, stub: L.stub ?? 0.13};
+    for (let i = 0; i < 3; i++) arm.add(shade(new THREE.Mesh(new THREE.CylinderGeometry(i ? 0.022 : 0.03, i ? 0.022 : 0.03, 1, 14), i ? m.steel : m.steel)));
+    R.tools.add(arm);
+  }
+  R.props.add(g);
+}
+/** Sets a unit cylinder (axis y) to span a..b. */
+function span(o, a, b) { const d = b.clone().sub(a); const l = Math.max(d.length(), 1e-4); o.position.copy(a).add(b).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(AX.y, d.divideScalar(l)); o.scale.set(1, l, 1); }
+/** Carriage rails (hack squat, Smith-style sleds): a point fixed to a body frame slides on two rails;
+ * the rails follow the line it travels between A and B, extended by lo below and hi above. */
+function trackRails(t, m) {
+  const {J} = R.F; const at = () => J[t.frame || 'chest'].localToWorld(V3(...t.v));
+  pose(0); const a = at(); pose(1); const b = at();
+  let dir = b.clone().sub(a); if (dir.length() < 0.05) return; dir.normalize(); if (dir.y < 0) dir.negate();
+  const lowP = a.y < b.y ? a : b, highP = a.y < b.y ? b : a;
+  const p0 = lowP.clone().addScaledVector(dir, -(t.lo ?? 0.4)), p1 = highP.clone().addScaledVector(dir, t.hi ?? 0.5), g = new THREE.Group(), w = t.w || 0.3;
+  p0.y = Math.max(p0.y, 0.12);
+  for (const s of [1, -1]) {
+    const q0 = [s * w, p0.y, p0.z], q1 = [s * w, p1.y, p1.z];
+    g.add(rbox(0.08, 0.08, 0.08, m.steel, s * w, p0.y, p0.z, 0.01), tube(q0, q1, 0.03, m.steel), tube([s * (w - 0.045), p0.y, p0.z], [s * (w - 0.045), p1.y, p1.z], 0.014, m.chrome, 10));
+    g.add(tube(q1, [s * w, 0, p1.z], 0.035, m.steel), tube(q0, [s * w, 0, p0.z], 0.035, m.steel));
+    g.add(rbox(0.08, 0.045, Math.abs(p1.z - p0.z) + 0.3, m.steel, s * w, 0.0225, (p0.z + p1.z) / 2, 0.012));
+  }
+  g.add(tube([-w, p1.y, p1.z], [w, p1.y, p1.z], 0.035, m.steel), tube([-w, 0.06, p0.z], [w, 0.06, p0.z], 0.03, m.steel));
+  R.props.add(g);
 }
 /** Leg press carriage rails along the sled's travel, behind the footplate. */
 function sledRails(spec, m) {

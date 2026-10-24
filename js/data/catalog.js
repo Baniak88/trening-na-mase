@@ -686,6 +686,22 @@ variant('lpcalf','legpress',{n:'Wspięcia na suwnicy',en:'Leg press calf raise',
 variant('dbcalf','calf',{n:'Wspięcia jednonóż z hantlem',en:'Single-leg dumbbell calf raise',p:'iso',kind:'db',inc:2,uni:1,m:{calves:1},
  cues:['Przód stopy na stopniu, hantel w ręce po stronie nogi','Pięta jak najniżej, pauza 1–2 s','Wspinaczka maksymalnie wysoko'],
  err:['Za mały zakres','Odbijanie się z dołu'],alt:['calf','seatedcalf']});
+/* Phase texts for variants whose copied base text named the wrong equipment or position. */
+const PHASE3={
+ frontsquat:{sA:['Ustawienie','Gryf na przednich barkach przy obojczykach, łokcie wysoko i do przodu, stopy na szerokość barków. Wdech do brzucha i napnij go.']},
+ singlerdl:{sB:['Dół','Cofaj biodra, tylna noga unosi się w linii z tułowiem, hantle zjeżdżają blisko nogi podporowej.']},
+ inclinebar:{sA:['Góra','Ławka 30–45°, gryf nad barkami, łopatki ściągnięte.'],sB:['Dół','Gryf schodzi do górnej części klatki, przedramiona pionowo pod gryfem.']},
+ smithincl:{sA:['Góra','Ławka 30–45°, gryf nad barkami, łopatki ściągnięte.'],sB:['Dół','Gryf schodzi pionowo do górnej części klatki, przedramiona pionowo.']},
+ ezskull:{sA:['Góra','Leżysz na ławce, gryf nad czołem, ramiona lekko w stronę głowy.'],sB:['Dół','Opuść gryf za głowę, łokcie zostają w miejscu.']},
+ dbthrust:{sA:['Dół','Dolne łopatki na krawędzi ławki, hantel na biodrach przytrzymany rękami, stopy płasko.']},
+ arnold:{sA:['Start','Hantle przed twarzą na wysokości brody, dłonie zwrócone do siebie, plecy przy oparciu.'],sB:['Góra','Wyciskaj nad głowę, obracając dłonie na zewnątrz. Na górze ręce nad barkami.']},
+ smithohp:{sA:['Start','Gryf przed twarzą na wysokości brody, plecy przy oparciu.'],sB:['Góra','Wyciśnij gryf pionowo nad głowę, łokcie prawie proste.']},
+ closepull:{sB:['Koniec','Uchwyt przy górnej części klatki, łokcie w dół wzdłuż tułowia.']},
+ onearmpull:{sA:['Start','Uda pod wałkiem, ręka wyprostowana, klatka do góry.'],sB:['Koniec','Uchwyt przy boku klatki, łokieć w dół do biodra.']},
+};
+const MARK3={'Hantle schodzą za głowę':{ezskull:'Gryf schodzi za głowę'},'Hantle schodzą do wysokości barków':{smithohp:'Gryf schodzi do wysokości brody'},'Drążek do górnej części klatki':{closepull:'Uchwyt do górnej części klatki',onearmpull:'Uchwyt do boku klatki'}};
+for(const id in PHASE3)Object.assign(EX[id].fig,PHASE3[id]);
+for(const id of ['ezskull','smithohp','closepull','onearmpull'])for(const mk of EX[id].fig.marks||[])if(MARK3[mk.l]&&MARK3[mk.l][id])mk.l=MARK3[mk.l][id];
 const NEEDS2={inclinebar:['barbell','bench'],smithbench:['machines','bench'],smithincl:['machines','bench'],inclinemach:['machines'],
  chinup:['pullup'],closepull:['cable'],onearmpull:['cable'],tbar:['barbell'],onearmrow:['cable'],
  arnold:['dumbbells','bench'],seatedlat:['dumbbells','bench'],smithohp:['machines','bench'],

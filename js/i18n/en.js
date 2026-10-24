@@ -683,7 +683,7 @@ export const EN={
 "Jak poprawnie wykonać to ćwiczenie i jak je wpleść w mój plan?": "How do I do this exercise properly and how do I fit it into my plan?",
 "mięśnie główne": "main muscles",
 "pomocnicze": "assisting",
-"Mój Trener · wersja 2.8": "My Trainer · version 2.8",
+"Mój Trener · wersja 2.9": "My Trainer · version 2.9",
 "przeciągnij, żeby obrócić": "drag to rotate",
 "Np. wt i pt, co najmniej 2 dni przerwy": "E.g. Tue and Fri, at least 2 days apart",
 "Np. pn / śr / pt, treningi A, B, C po kolei": "E.g. Mon / Wed / Fri, workouts A, B and C in turn",

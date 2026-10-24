@@ -17,7 +17,10 @@
  *   at: anchor the hands' mid point (deadlift from the floor); pin: keep a body point on a support.
  * eq: bar, db, db1 (one dumbbell, both hands), grip, sled, cable, rope, cable1 (handle per hand), landmine;
  *   one: 'L' for one-arm work; dba: dumbbell axis (c = chest, f = forearm frame + x/y/z); dbo: offset.
- * ecc: A to B is the lowering phase (played slower). view [yaw, pitch]: yaw 0 = front, 90 = the figure's left. */
+ * ecc: A to B is the lowering phase (played slower). view [yaw, pitch]: yaw 0 = front, 90 = the figure's left.
+ * Machines: track {frame, v, w, lo, hi} = carriage rails along the path of a body point (hack squat, calf machine);
+ *   lever {d, len, stub} = arm from the handles to a pivot (presses, rows) or {axis} = arm turning about a vertical axis
+ *   above the shoulder (pec deck); roller gets a lever on the knee axis; pads/props: post, stem; box steel; bar ez. */
 
 const STAND = {w: 0.15, toe: 12};
 const LIE = (y, z = 0.22) => [0, y, z, -90, 0];
@@ -31,33 +34,34 @@ const P = {
   squat: {eq: 'bar', ecc: 1, grip: 0.42, feet: {w: 0.17, toe: 20}, kp: [0.3, 0, 1], bal: {v: [0, 0.29, -0.085]}, ep: [0.3, -1, -0.45], view: [62, 8],
     A: {root: [0, 0.95, 0, 0, 0], tilt: 4, stand: 1, bal: 1, hc: [0, 0.29, -0.085]},
     B: {root: [0, 0.46, 0, 0, 0], tilt: 40, sp: 4, nk: -14, bal: 1, hc: [0, 0.29, -0.085]}},
-  frontsquat: {eq: 'bar', ecc: 1, grip: 0.24, feet: {w: 0.17, toe: 20}, kp: [0.3, 0, 1], bal: {v: [0, 0.262, 0.135]}, ep: [0.3, 0.02, 1], view: [62, 8],
-    A: {root: [0, 0.95, 0, 0, 0], stand: 1, bal: 1, hc: [0, 0.262, 0.135]},
-    B: {root: [0, 0.43, 0, 0, 0], tilt: 24, nk: -12, bal: 1, hc: [0, 0.262, 0.135]}},
+  frontsquat: {eq: 'bar', ecc: 1, grip: 0.24, feet: {w: 0.17, toe: 20}, kp: [0.3, 0, 1], bal: {v: [0, 0.32, 0.07]}, ep: [0.25, -0.2, 1], view: [62, 8],
+    A: {root: [0, 0.95, 0, 0, 0], stand: 1, bal: 1, hc: [0, 0.32, 0.07], wr: -85}, // front rack: bar on the front delts, elbows forward
+    B: {root: [0, 0.43, 0, 0, 0], tilt: 24, nk: -12, bal: 1, hc: [0, 0.32, 0.07], wr: -85}},
   goblet: {eq: 'db1', ecc: 1, dba: 'cy', dbo: [0, -0.09, 0.02], grip: 0.05, feet: {w: 0.2, toe: 28}, kp: [0.55, 0, 1], bal: {v: [0, 0.12, 0.2]}, ep: [0.35, -1, 0.25], view: [50, 8],
     A: {root: [0, 0.95, 0, 0, 0], stand: 1, bal: 1, hc: [0, 0.2, 0.19]},
     B: {root: [0, 0.4, 0, 0, 0], tilt: 20, nk: -10, bal: 1, hc: [0, 0.2, 0.19]}},
-  smithsquat: {eq: 'bar', ecc: 1, grip: 0.42, props: [['rails']], feet: {w: 0.17, toe: 18, z: 0.16}, kp: [0.4, 0, 1], bal: {v: [0, 0.29, -0.085]}, balZ: 0, ep: [0.3, -1, -0.45], view: [62, 8],
+  smithsquat: {eq: 'bar', ecc: 1, grip: 0.42, props: [['rails', {w: 0.52, z: 0}]], feet: {w: 0.17, toe: 18, z: 0.16}, kp: [0.4, 0, 1], bal: {v: [0, 0.29, -0.085]}, balZ: 0, ep: [0.3, -1, -0.45], view: [62, 8],
     A: {root: [0, 0.95, 0, 0, 0], stand: 1, bal: 1, hc: [0, 0.29, -0.085]},
     B: {root: [0, 0.47, 0, 0, 0], tilt: 26, nk: -10, bal: 1, hc: [0, 0.29, -0.085]}},
   hack: {eq: 'none', ecc: 1, grip: 0.3, feet: {w: 0.16, z: 0.42, y: 0.115, toe: 15}, kp: [0.35, 0, 1], ep: [1, -1, 0.2], view: [72, 6],
-    props: [['plate', {w: 0.7, d: 0.5, y: 0.05, z: 0.45, rx: -15}], ['pad', {w: 0.05, h: 2.0, d: 0.05, x: 0.36, y: 0.95, z: -0.25, rx: -40}], ['pad', {w: 0.05, h: 2.0, d: 0.05, x: -0.36, y: 0.95, z: -0.25, rx: -40}]],
-    pads: [{v: [0, 0.12, -0.165], w: 0.42, h: 0.62, d: 0.06}, {v: [0.13, 0.31, -0.02], w: 0.11, h: 0.07, d: 0.24}, {v: [-0.13, 0.31, -0.02], w: 0.11, h: 0.07, d: 0.24}],
+    props: [['plate', {w: 0.7, d: 0.5, y: 0.05, z: 0.45, rx: -15}], ],
+    track: {frame: 'chest', v: [0, 0.1, -0.25], w: 0.3, lo: 0.45, hi: 0.35},
+    pads: [{v: [0, 0.09, -0.165], w: 0.42, h: 0.74, d: 0.06}, {v: [0.13, 0.31, -0.02], w: 0.11, h: 0.07, d: 0.24}, {v: [-0.13, 0.31, -0.02], w: 0.11, h: 0.07, d: 0.24}],
     A: {root: [0, 0.86, -0.1, 0, 0], tilt: -40, fp: -15, hc: [0, 0.33, 0.06]},
     B: {root: [0, 0.53, 0.18, 0, 0], tilt: -40, fp: -15, hc: [0, 0.33, 0.06]}},
-  lunge: {eq: 'db', ecc: 1, dba: 'cz', feet: {w: 0.1, toe: 6, ball: true}, view: [80, 6],
+  lunge: {eq: 'db', ecc: 1, dba: 'cz', feet: {w: 0.1, toe: 6, ball: true}, kp: [[0.25, 0, 1], [0, -0.6, 1]], view: [80, 6],
     A: {root: [0, 0.9, -0.02, 0, 0], stand: 1, soft: 0.02, fz: [0.55, -0.42], fp: [0, 40], sa: 7, el: 6},
     B: {root: [0, 0.56, -0.03, 0, 0], tilt: 3, fz: [0.55, -0.42], fp: [0, 60], sa: 7, el: 6}},
-  bss: {eq: 'db', ecc: 1, dba: 'cz', feet: {w: 0.1, toe: 6, ball: [true, false]}, props: [['bench', {len: 0.45, z: -0.62}]], view: [80, 6],
+  bss: {eq: 'db', ecc: 1, dba: 'cz', feet: {w: 0.1, toe: 6, ball: [true, false]}, kp: [[0.25, 0, 1], [0, -1, 0.3]], props: [['bench', {len: 0.45, z: -0.62}]], view: [80, 6],
     A: {root: [0, 0.95, -0.03, 0, 0], stand: 1, soft: 0.015, fz: [0.33, -0.52], fy: [0.02, 0.53], fp: [0, 118], sa: 7, el: 6},
     B: {root: [0, 0.5, -0.08, 0, 0], tilt: 12, fz: [0.33, -0.52], fy: [0.02, 0.53], fp: [0, 118], sa: 7, el: 6}},
   legpress: {eq: 'sled', ecc: 1, ground: false, sledTilt: 45, feet: {w: 0.15, toe: 10}, kp: [0.3, 0, 1], view: [84, 10],
-    props: [['pad', {w: 0.5, h: 0.07, d: 1.05, y: 0.69, z: -0.31, rx: 40}], ['pad', {w: 0.5, h: 0.08, d: 0.4, y: 0.4, z: 0.02, rx: 10}], ['box', {w: 0.12, h: 0.36, d: 0.12, z: -0.05}]],
+    props: [['pad', {w: 0.5, h: 0.07, d: 1.05, y: 0.69, z: -0.31, rx: 40}], ['pad', {w: 0.5, h: 0.08, d: 0.4, y: 0.4, z: 0.02, rx: 10}], ['box', {w: 0.12, h: 0.36, d: 0.12, z: -0.05, steel: true}]],
     A: {root: [0, 0.55, 0, -50, 0], fy: 1.07, fz: 0.66, fp: -128, sa: 25, el: 30, sf: 10},
     B: {root: [0, 0.55, 0, -50, 0], fy: 0.76, fz: 0.35, fp: -128, sa: 25, el: 30, sf: 10}},
   legext: {eq: 'none', ground: false, props: [['seat', {y: 0.5, backH: 0.65}]], roller: {at: 0.37, z: 0.075}, view: [78, 8],
     A: {...SIT(), hf: 90, kn: 92, an: 5, sa: 16, el: 30, sf: 15}, B: {...SIT(), hf: 90, kn: 3, an: -12, sa: 16, el: 30, sf: 15}},
-  legcurl: {eq: 'none', ground: false, props: [['seat', {y: 0.5, backH: 0.7, backTilt: 0.05}], ['pad', {w: 0.45, h: 0.08, d: 0.16, y: 0.74, z: 0.4}]], roller: {at: 0.38, z: -0.075}, view: [78, 8],
+  legcurl: {eq: 'none', ground: false, props: [['seat', {y: 0.5, backH: 0.7, backTilt: 0.05}], ['pad', {w: 0.45, h: 0.08, d: 0.16, y: 0.71, z: 0.4, post: true}]], roller: {at: 0.38, z: -0.075}, view: [78, 8],
     A: {...SIT(), tilt: -8, hf: 82, kn: 4, an: -5, sa: 16, el: 30, sf: 15}, B: {...SIT(), tilt: -8, hf: 82, kn: 112, an: 5, sa: 16, el: 30, sf: 15}},
   lyingcurl: {eq: 'none', ground: false, props: [['bench', {len: 1.15, y: 0.62, z: 0.12}]], roller: {at: 0.38, z: -0.075}, view: [82, 12],
     A: {root: [0, 0.74, -0.05, 92, 0], hf: -2, kn: 3, sf: 160, el: 70, sa: 25}, B: {root: [0, 0.74, -0.05, 92, 0], hf: -2, kn: 118, an: 10, sf: 160, el: 70, sa: 25}},
@@ -74,7 +78,7 @@ const P = {
     A: {root: [0, 0.95, 0, 0, 0], stand: 1, soft: 0.015, bal: 1, hs: HANG(-0.02), hf: [0, -4], kn: [0, 22], an: [0, 15]},
     B: {root: [0, 0.95, 0, 0, 0], tilt: 84, nk: -28, stand: 1, soft: 0.035, bal: 1, hs: HANG(-0.02), hf: [0, 2], kn: [0, 8], an: [0, 10]}},
   hipext: {eq: 'none', ecc: 1, ground: false, feet: {w: 0.11, toe: 8}, kp: [0.2, 0, 1], pin: {f: 'p', v: [0, -0.05, 0], w: [0, 0.95, 0.06]}, ep: [1, -1, 0.3], view: [84, 8],
-    props: [['pad', {w: 0.42, h: 0.12, d: 0.26, y: 0.84, z: 0.15, rx: 45}], ['pad', {w: 0.42, h: 0.1, d: 0.1, y: 0.37, z: -0.66}], ['pad', {w: 0.1, h: 0.1, d: 1.05, y: 0.6, z: -0.25, rx: -45}], ['box', {w: 0.1, h: 0.6, d: 0.1, z: -0.25}]],
+    props: [['pad', {w: 0.42, h: 0.12, d: 0.26, y: 0.84, z: 0.15, rx: 45}], ['pad', {w: 0.42, h: 0.1, d: 0.1, y: 0.37, z: -0.66}], ['pad', {w: 0.1, h: 0.1, d: 1.05, y: 0.6, z: -0.25, rx: -45}], ['box', {steel: true, w: 0.1, h: 0.6, d: 0.1, z: -0.25}]],
     A: {root: [0, 0.95, 0, 45, 0], fy: 0.33, fz: -0.56, fp: 45, hc: [[-0.09, 0.18, 0.2], [0.09, 0.21, 0.21]]},
     B: {root: [0, 0.95, 0, 132, 0], nk: -10, fy: 0.33, fz: -0.56, fp: 45, hc: [[-0.09, 0.18, 0.2], [0.09, 0.21, 0.21]]}},
   nordic: {eq: 'none', ecc: 1, ground: false, feet: {w: 0.1, toe: 0}, kp: [0.02, -1, 0.5], ep: [0.8, -1, 0.2], view: [84, 6],
@@ -85,15 +89,15 @@ const P = {
   hipthrust: {eq: 'bar', grip: 0.36, ground: false, props: [['bench', {len: 0.45, z: -0.6}]], feet: {w: 0.17, z: 0.5, toe: 14}, kp: [0.3, 0, 1], pin: {f: 'c', v: [0, 0.14, -0.105], w: [0, 0.485, -0.37]}, ep: [1, 0.5, 0.3], view: [84, 10],
     A: {root: [0, 0.35, 0, -45, 0], nk: 10, hp: [0, -0.03, 0.17]},
     B: {root: [0, 0.55, 0, -90, 0], nk: 28, hp: [0, -0.03, 0.17]}},
-  glutebridge: {eq: 'bar', grip: 0.36, ground: false, feet: {w: 0.17, z: 0.42, toe: 12}, kp: [0.3, 0, 1], pin: {f: 'c', v: [0, 0.3, -0.08], w: [0, 0, -0.42]}, rest: 0.005, ep: [1, 0.5, 0.3], view: [84, 12],
+  glutebridge: {eq: 'bar', grip: 0.36, ground: false, feet: {w: 0.17, z: 0.42, toe: 12}, kp: [0.3, 0, 1], pin: {f: 'c', v: [0, 0.3, -0.08], w: [0, 0, -0.42]}, rest: 0.005, ep: [1, 0.5, 0.3], view: [38, 26],
     A: {root: [0, 0.12, 0, -90, 0], hp: [0, -0.03, 0.17]},
     B: {root: [0, 0.3, 0, -112, 0], nk: 22, hp: [0, -0.03, 0.17]}},
-  calf: {eq: 'none', feet: {w: 0.14, toe: 10, ball: true}, props: [['box', {w: 0.6, h: 0.1, d: 0.32, z: 0.2}]], ep: [1, -1, 0.2], view: [76, 4],
+  calf: {eq: 'none', feet: {w: 0.14, toe: 10, ball: true}, props: [['box', {w: 0.6, h: 0.1, d: 0.32, z: 0.2}]], track: {frame: 'chest', v: [0, 0.3, -0.2], w: 0.32, lo: 1.2, hi: 0.5}, ep: [1, -1, 0.2], view: [76, 4],
     pads: [{v: [0.13, 0.31, -0.01], w: 0.11, h: 0.07, d: 0.24}, {v: [-0.13, 0.31, -0.01], w: 0.11, h: 0.07, d: 0.24}],
     A: {root: [0, 0.95, 0, 0, 0], stand: 1, fy: 0.12, fz: 0.07, fp: -22, hs: [0.11, 0.06, 0.12]},
     B: {root: [0, 0.95, 0, 0, 0], stand: 1, fy: 0.12, fz: 0.07, fp: 38, hs: [0.11, 0.06, 0.12]}},
   seatedcalf: {eq: 'none', ground: false, feet: {w: 0.13, toe: 8, ball: true}, kp: [0.2, 0, 1], props: [['seat', {y: 0.48, back: false}], ['box', {w: 0.5, h: 0.1, d: 0.25, z: 0.5}]],
-    pads: [{frame: 'hpL', v: [-0.11, -0.36, 0.065], w: 0.42, h: 0.16, d: 0.07}], grip: 0.17, view: [70, 8],
+    pads: [{frame: 'hpL', v: [-0.11, -0.36, 0.065], w: 0.42, h: 0.16, d: 0.07, post: true}], grip: 0.17, view: [70, 8],
     A: {...SIT(0.63), tilt: 10, fy: 0.12, fz: 0.47, fp: -22, hp: [0, 0.03, 0.42]},
     B: {...SIT(0.63), tilt: 10, fy: 0.12, fz: 0.47, fp: 34, hp: [0, 0.03, 0.42]}},
   /* ---------- chest ---------- */
@@ -110,9 +114,9 @@ const P = {
   cablefly: {eq: 'cable1', props: [['tower', {x: 0.95, y: 1.9, z: -0.2}], ['tower', {x: -0.95, y: 1.9, z: -0.2}]], feet: {w: 0.12, toe: 8, ball: true}, ep: [1, 0.25, -0.6], view: [28, 8],
     A: {root: [0, 0.95, 0, 0, 0], tilt: 14, stand: 1, soft: 0.02, fz: [0.28, -0.22], fp: [0, 32], hv: [0.85, 0.48, -0.25], hr: 0.55},
     B: {root: [0, 0.95, 0, 0, 0], tilt: 14, stand: 1, soft: 0.02, fz: [0.28, -0.22], fp: [0, 32], hv: [0.1, -0.72, 0.7], hr: 0.55}},
-  pecdeck: {eq: 'grip', ground: false, props: [['seat', {y: 0.48, backH: 0.78}]], feet: SEATFEET, ep: [0.2, -1, -0.5], view: [32, 14],
+  pecdeck: {eq: 'grip', ground: false, lever: {axis: 0.32, zb: -0.45}, props: [['seat', {y: 0.48, backH: 0.78}]], feet: SEATFEET, ep: [0.2, -1, -0.5], view: [32, 14],
     A: {...SIT(), hv: [1, 0.03, -0.22], hr: 0.52}, B: {...SIT(), hv: [0.16, 0.03, 1], hr: 0.52}},
-  chestpress: {eq: 'grip', ground: false, grip: 0.29, props: [['seat', {y: 0.48, backH: 0.78}]], feet: SEATFEET, ep: [1, -0.6, -0.4], view: [60, 10],
+  chestpress: {eq: 'grip', ground: false, lever: {d: [0, 1, -0.15], len: 0.75}, grip: 0.29, props: [['seat', {y: 0.48, backH: 0.78}]], feet: SEATFEET, ep: [1, -0.6, -0.4], view: [60, 10],
     A: {...SIT(), hc: [0, 0.19, 0.15]}, B: {...SIT(), hs: [0.07, -0.06, 0.585]}},
   /* ---------- shoulders ---------- */
   ohp: {eq: 'bar', grip: 0.27, feet: STAND, ep: [0.3, -1, 0.8], view: [52, 4],
@@ -121,7 +125,7 @@ const P = {
     B: {root: [0, 0.95, 0, 0, 0], stand: 1, nk: 6, hs: [0.065, 0.6, 0.02], ep: [1, -0.3, 0]}},
   dbohp: {eq: 'db', dba: 'cx', ground: false, props: [['seat', {y: 0.48, backH: 0.78}]], feet: SEATFEET, ep: [1, -1, 0.1], view: [36, 8],
     A: {...SIT(), hs: [0.25, 0.12, 0.03]}, B: {...SIT(), hs: [0.06, 0.6, 0.02]}},
-  machpress: {eq: 'grip', ground: false, props: [['seat', {y: 0.48, backH: 0.78}]], feet: SEATFEET, ep: [1, -1, 0.1], view: [36, 8],
+  machpress: {eq: 'grip', ground: false, lever: {d: [0, 0, -1], len: 0.62}, props: [['seat', {y: 0.48, backH: 0.78}]], feet: SEATFEET, ep: [1, -1, 0.1], view: [36, 8],
     A: {...SIT(), hs: [0.23, 0.12, 0.08]}, B: {...SIT(), hs: [0.1, 0.58, 0.08]}},
   latraise: {eq: 'db', dba: 'cz', feet: STAND, ep: [0, 1, -0.7], view: [14, 6],
     A: {root: [0, 0.95, 0, 0, 0], stand: 1, tilt: 4, hv: [0.22, -1, 0.14], hr: 0.565},
@@ -134,10 +138,10 @@ const P = {
     A: {root: [0, 1.3, 0, 0, 0], tilt: -2, hf: 8, kn: 35, an: 15, hw: [0, 2.3, 0]},
     B: {root: [0, 1.765, -0.06, 0, 0], tilt: -10, nk: -10, hf: 12, kn: 40, an: 15, hw: [0, 2.3, 0]}},
   latpull: {eq: 'cable', handle: 1.15, ground: false, grip: 0.42, feet: SEATFEET, ep: [1, -0.8, -0.25], view: [205, 10],
-    props: [['seat', {y: 0.48, back: false}], ['tower', {y: 2.25, z: 0.08, back: 0.35}], ['pad', {w: 0.45, h: 0.08, d: 0.12, y: 0.79, z: 0.32}]],
+    props: [['seat', {y: 0.48, back: false}], ['tower', {y: 2.25, z: 0.08, back: 0.35}], ['pad', {w: 0.45, h: 0.08, d: 0.12, y: 0.79, z: 0.32, post: true}]],
     A: {...SIT(), hs: [0.215, 0.575, 0.08]}, B: {...SIT(), tilt: -14, hc: [0, 0.27, 0.15]}},
   cablerow: {eq: 'cable', handle: 0.16, ground: false, grip: 0.06, feet: {w: 0.13, toe: 6}, kp: [0.3, 0, 1], ep: [0.3, -0.5, -1], view: [84, 10],
-    props: [['box', {w: 0.4, h: 0.32, d: 0.55, z: -0.08}], ['tower', {y: 0.42, z: 1.08, back: 0.12}], ['pad', {w: 0.5, h: 0.32, d: 0.06, y: 0.3, z: 0.86, rx: -18}]],
+    props: [['bench', {len: 0.62, y: 0.285, z: -0.06}], ['tower', {y: 0.42, z: 1.08, back: 0.12}], ['pad', {w: 0.5, h: 0.32, d: 0.06, y: 0.3, z: 0.86, rx: -18}]],
     A: {root: [0, 0.43, 0, 0, 0], tilt: 24, fy: 0.23, fz: 0.79, fp: -70, hs: [-0.16, -0.1, 0.58]},
     B: {root: [0, 0.43, 0, 0, 0], tilt: -4, fy: 0.23, fz: 0.79, fp: -70, hc: [0, -0.05, 0.16]}},
   row: {eq: 'bar', grip: 0.3, feet: {w: 0.15, toe: 10}, kp: [0.25, 0, 1], bal: 'hands', bal0: true, ep: [0.45, -0.45, -1], view: [80, 8],
@@ -158,10 +162,10 @@ const P = {
     A: {root: [0, 0.95, 0, 0, 0], stand: 1, tilt: -3, sa: 8, el: 6, sf: 10}, B: {root: [0, 0.95, 0, 0, 0], stand: 1, tilt: -3, sa: 8, el: 136, sf: 16}},
   inclinecurl: {eq: 'db', dba: 'fx', pr: 90, ground: false, props: [['incline', {inc: 55}]], feet: {w: 0.22, z: 0.55, toe: 15}, kp: [0.3, 0, 1], view: [84, 8],
     A: {root: [0, 0.62, -0.02, -36, 0], sf: -34, el: 3, sa: 6, sr: 10}, B: {root: [0, 0.62, -0.02, -36, 0], sf: -24, el: 135, sa: 6, sr: 10}},
-  preacher: {eq: 'db', dba: 'fx', pr: 90, ground: false, props: [['seat', {y: 0.48, back: false}], ['pad', {w: 0.5, h: 0.08, d: 0.34, y: 0.875, z: 0.17, rx: 34}], ['box', {w: 0.08, h: 0.9, d: 0.08, z: 0.3}]], feet: SEATFEET, view: [74, 10],
+  preacher: {eq: 'db', dba: 'fx', pr: 90, ground: false, props: [['seat', {y: 0.48, back: false}], ['pad', {w: 0.5, h: 0.08, d: 0.34, y: 0.875, z: 0.17, rx: 34}], ['box', {w: 0.08, h: 0.9, d: 0.08, z: 0.3, steel: true}]], feet: SEATFEET, view: [52, 16],
     A: {...SIT(), tilt: 10, sf: 46, sa: 12, el: 10}, B: {...SIT(), tilt: 10, sf: 46, sa: 12, el: 126}},
-  conc: {eq: 'db', one: 'L', dba: 'fx', pr: [90, 0], ground: false, props: [['box', {w: 0.4, h: 0.45, d: 0.4}]], feet: {w: 0.3, z: 0.42, toe: 25}, kp: [0.6, 0, 1], view: [42, 8],
-    A: {root: [0, 0.56, 0, 0, 0], tilt: 40, nk: -15, sf: [44, 40], sa: [5, 20], el: [6, 60]}, B: {root: [0, 0.56, 0, 0, 0], tilt: 40, nk: -15, sf: [44, 40], sa: [5, 20], el: [128, 60]}},
+  conc: {eq: 'db', one: 'L', dba: 'fx', pr: [90, 0], ground: false, props: [['bench', {len: 1.1, y: 0.41, z: -0.4}]], feet: {w: 0.3, z: 0.42, toe: 25}, kp: [0.6, 0, 1], view: [42, 8],
+    A: {root: [0, 0.56, 0, 0, 0], tilt: 40, nk: -15, sf: [44, 40], sa: [5, 20], el: [6, 60], hw: [null, [-0.31, 0.6, 0.34]]}, B: {root: [0, 0.56, 0, 0, 0], tilt: 40, nk: -15, sf: [44, 40], sa: [5, 20], el: [128, 60], hw: [null, [-0.31, 0.6, 0.34]]}}, // free hand on the other knee
   triext: {eq: 'db1', ecc: 1, dba: 'fy', dbo: [0, 0.1, 0.02], feet: STAND, view: [74, 6],
     A: {root: [0, 0.95, 0, 0, 0], stand: 1, sf: 172, sa: 8, el: 8}, B: {root: [0, 0.95, 0, 0, 0], stand: 1, sf: 168, sa: 10, el: 150}},
   ropeoh: {eq: 'rope', props: [['tower', {y: 0.62, z: -0.62, back: -0.1}]], feet: {w: 0.12, toe: 8, ball: true}, view: [78, 6],
@@ -178,39 +182,40 @@ const P = {
 
 /* Variants. Same movement → same pose; otherwise a pose derived from the closest one. */
 const one = (base, extra) => ({...base, ...extra});
-const SAME = {walklunge: 'lunge', splitsquat: 'lunge', inclinebar: null, ezcurl: 'barcurl', ezskull: null};
+const SAME = {walklunge: 'lunge', splitsquat: 'lunge', inclinebar: null, ezcurl: null, ezskull: null};
 for (const [a, b] of Object.entries(SAME)) if (b) P[a] = P[b];
 P.inclinebar = one(P.incline, {eq: 'bar', grip: 0.39, A: {root: P.incline.A.root, hs: [0.185, 0.57, 0]}, B: {root: P.incline.A.root, hc: [0, 0.235, 0.135]}});
-P.smithincl = one(P.inclinebar, {props: [['incline', {inc: 38}], ['rails', {w: 0.62}]]});
-P.smithbench = one(P.bench, {props: [['bench'], ['rails', {w: 0.62}]], A: {root: LIE(0.585), hc: [0, 0.14, 0.555]}});
-P.ezskull = one(P.skull, {eq: 'bar', barLen: 1.25, plate: 0.13});
+P.smithincl = one(P.inclinebar, {props: [['incline', {inc: 38}], ['rails', {w: 0.52, z: -0.29}]], A: {root: P.incline.A.root, hw: [0, 1.44, -0.29]}, B: {root: P.incline.A.root, hw: [0, 1.0, -0.29]}});
+P.smithbench = one(P.bench, {props: [['bench'], ['rails', {w: 0.52, z: -0.09}]], A: {root: LIE(0.585), hc: [0, 0.14, 0.555]}});
+P.ezskull = one(P.skull, {eq: 'bar', ez: true, barLen: 1.45, plate: 0.13});
+P.ezcurl = one(P.barcurl, {ez: true, barLen: 1.45, plate: 0.15, grip: 0.16, pr: 60});
 P.legext1 = one(P.legext, {roller: {at: 0.37, z: 0.075, side: 'L'}, A: {...P.legext.A, kn: [92, 90]}, B: {...P.legext.B, kn: [3, 90], an: [-12, 5]}});
 P.dbthrust = one(P.hipthrust, {eq: 'db1', dba: 'cx', grip: 0.09});
 P.singlebridge = one(P.glutebridge, {eq: 'none', fik: 'L', ep: [0.6, -1, 0.2],
   A: {...P.glutebridge.A, hf: [0, 70], kn: [0, 12], hp: undefined, sa: 20, el: 6, sf: 5}, B: {...P.glutebridge.B, hf: [0, 18], kn: [0, 6], hp: undefined, sa: 20, el: 6, sf: 5}});
-P.dbcalf = one(P.calf, {eq: 'db', one: 'L', dba: 'cz', fik: 'L', pads: [], props: [['box', {w: 0.4, h: 0.1, d: 0.32, z: 0.2}], ['box', {w: 0.06, h: 1.9, d: 0.06, x: -0.34, z: 0.42, y: 0.95}]],
+P.dbcalf = one(P.calf, {eq: 'db', one: 'L', dba: 'cz', fik: 'L', pads: [], props: [['box', {w: 0.4, h: 0.1, d: 0.32, z: 0.2}], ['box', {w: 0.06, h: 1.9, d: 0.06, x: -0.34, z: 0.42, y: 0.95, steel: true}]],
   A: {...P.calf.A, hs: [[0, -0.612, 0], null], hw: [null, [-0.33, 1.3, 0.37]], kn: [0, 80], hf: [0, 10]}, B: {...P.calf.B, hs: [[0, -0.612, 0], null], hw: [null, [-0.33, 1.3, 0.37]], kn: [0, 80], hf: [0, 10]}});
 P.lpcalf = one(P.legpress, {ecc: 0, sledBall: true, A: {...P.legpress.A, fy: 1.085, fz: 0.675, fp: -145}, B: {...P.legpress.A, fy: 1.085, fz: 0.675, fp: -97}});
-P.inclinemach = one(P.chestpress, {props: [['seat', {y: 0.48, backH: 0.8, backTilt: 0.12}]], A: {...SIT(), tilt: -12, hc: [0, 0.22, 0.15]}, B: {...SIT(), tilt: -12, hs: [0.06, 0.32, 0.5]}});
-P.arnold = one(P.dbohp, {A: {...SIT(), hs: [0.03, 0.13, 0.2]}, M: {...SIT(), hs: [0.2, 0.3, 0.1]}, B: P.dbohp.B, ep: [0.3, -1, 0.7]});
+P.inclinemach = one(P.chestpress, {lever: {d: [0, 1, -0.9], len: 0.75, stub: 0.2}, props: [['seat', {y: 0.48, backH: 0.8, backTilt: 0.12}]], A: {...SIT(), tilt: -12, hc: [0, 0.22, 0.15]}, B: {...SIT(), tilt: -12, hs: [0.06, 0.32, 0.5]}});
+P.arnold = one(P.dbohp, {A: {...SIT(), hs: [0.03, 0.13, 0.2], pr: 90}, M: {...SIT(), hs: [0.2, 0.3, 0.1], pr: 40}, B: P.dbohp.B, ep: [0.3, -1, 0.7]}); // palms to the face at the start, turned out on the way up
 P.arnold.M.ep = [1, -1, 0.3]; P.arnold.B = {...P.dbohp.B, ep: [1, -1, 0.1]};
-P.smithohp = one(P.dbohp, {eq: 'bar', grip: 0.4, props: [['seat', {y: 0.48, backH: 0.78}], ['rails', {w: 0.62}]], ep: [0.6, -1, 0.4],
-  A: {...SIT(), hc: [0, 0.37, 0.19]}, B: {...SIT(), hs: [0.195, 0.565, 0.1]}});
+P.smithohp = one(P.dbohp, {eq: 'bar', grip: 0.4, props: [['seat', {y: 0.48, backH: 0.78}], ['rails', {w: 0.52, z: 0.17}]], ep: [0.6, -1, 0.4],
+  A: {...SIT(), hw: [0, 1.17, 0.17]}, B: {...SIT(), hw: [0, 1.6, 0.17]}});
 P.seatedlat = one(P.latraise, {ground: false, props: [['seat', {y: 0.48, back: false}]], feet: SEATFEET, A: {...SIT(), hv: [0.22, -1, 0.14], hr: 0.565}, B: {...SIT(), hv: [1, 0.04, 0.14], hr: 0.565}});
 P.cablelat = one(P.latraise, {eq: 'cable1', one: 'L', props: [['tower', {x: -0.45, y: 0.15, z: 0.1, back: -0.05}]],
   A: {...P.latraise.A, hv: [[-0.25, -1, 0.3], null], sa: [8, 40], el: [8, 80], sf: [0, 30]}, B: {...P.latraise.B, hv: [[1, 0.04, 0.14], null], sa: [8, 40], el: [8, 80], sf: [0, 30]}});
 P.closepull = one(P.latpull, {handle: 0.14, grip: 0.06, ep: [0.3, -1, -0.5], A: {...SIT(), hs: [-0.145, 0.58, 0.09]}, B: {...SIT(), tilt: -14, hc: [0, 0.2, 0.17]}});
-P.onearmpull = one(P.latpull, {eq: 'cable1', one: 'L', props: [['seat', {y: 0.48, back: false}], ['tower', {x: 0.2, y: 2.25, z: 0.08, back: 0.35}], ['pad', {w: 0.45, h: 0.08, d: 0.12, y: 0.79, z: 0.32}]], ep: [0.8, -1, -0.2],
+P.onearmpull = one(P.latpull, {eq: 'cable1', one: 'L', props: [['seat', {y: 0.48, back: false}], ['tower', {x: 0.2, y: 2.25, z: 0.08, back: 0.35}], ['pad', {w: 0.45, h: 0.08, d: 0.12, y: 0.79, z: 0.32, post: true}]], ep: [0.8, -1, -0.2],
   A: {...SIT(), hs: [[0, 0.6, 0.1], null], sf: [0, 35], el: [0, 70], sa: [0, 12]}, B: {...SIT(), tilt: -6, hc: [[0.22, 0.22, 0.06], null], sf: [0, 35], el: [0, 70], sa: [0, 12]}});
 P.tbar = one(P.row, {eq: 'landmine', pivot: [0, 0.04, -1.25], grip: 0.06, ep: [0.3, -0.4, -1],
   A: {...P.row.A, hs: HANG(-0.17)}, B: {...P.row.B, hc: [0, 0.06, 0.16]}});
-P.onearmrow = one(P.cablerow, {eq: 'cable1', one: 'L', A: {...P.cablerow.A, hs: [[0.02, -0.08, 0.59], null], sf: [0, 40], el: [0, 70]}, B: {...P.cablerow.B, hc: [[0.17, -0.06, 0.06], null], sf: [0, 40], el: [0, 70]}});
-P.machinerow = {eq: 'grip', ground: false, grip: 0.22, feet: SEATFEET, ep: [0.3, -0.3, -1], view: [80, 10],
-  props: [['seat', {y: 0.48, back: false}], ['pad', {w: 0.3, h: 0.45, d: 0.08, y: 0.95, z: 0.2}]],
+P.onearmrow = one(P.cablerow, {eq: 'cable1', one: 'L', A: {...P.cablerow.A, hs: [[0.02, -0.08, 0.59], null], hw: [null, [-0.22, 0.52, 0.3]]}, B: {...P.cablerow.B, hc: [[0.17, -0.06, 0.06], null], hw: [null, [-0.22, 0.52, 0.3]]}});
+P.machinerow = {eq: 'grip', ground: false, lever: {d: [0, 1, 0.15], len: 0.8, zb: 0.55}, grip: 0.22, feet: SEATFEET, ep: [0.3, -0.3, -1], view: [80, 10],
+  props: [['seat', {y: 0.48, back: false}], ['pad', {w: 0.3, h: 0.45, d: 0.08, y: 0.95, z: 0.2, stem: 0.62}]],
   A: {...SIT(), tilt: 6, hs: [0.02, -0.05, 0.6]}, B: {...SIT(), tilt: 6, hc: [0, 0.12, 0.06]}};
 P.cablecurl1 = one(P.cablecurl, {eq: 'cable1', one: 'L', props: [['tower', {x: 0.25, y: 0.15, z: 0.62, back: 0.1}]], A: {...P.cablecurl.A, el: [6, 8]}, B: {...P.cablecurl.B, el: [136, 8], sf: [16, 8]}});
 P.pushdown1 = one(P.pushdown, {eq: 'cable1', one: 'L', props: [['tower', {x: 0.2, y: 2.1, z: 0.45, back: 0.1}]], A: {...P.pushdown.A, el: [112, 30]}, B: {...P.pushdown.B, el: [4, 30]}});
 P.triext1 = one(P.triext, {eq: 'db', one: 'L', dba: 'fz', dbo: null, A: {...P.triext.A, sf: [172, 10], el: [8, 30], sa: [4, 10]}, B: {...P.triext.B, sf: [168, 10], el: [150, 30], sa: [4, 10]}});
-P.revpec = {eq: 'grip', ground: false, props: [['seat', {y: 0.48, back: false}], ['pad', {w: 0.36, h: 0.6, d: 0.08, y: 0.95, z: 0.2}]], feet: SEATFEET, ep: [1, 0.2, -0.3], view: [200, 14],
+P.revpec = {eq: 'grip', ground: false, lever: {axis: 0.3, zb: 0.5}, props: [['seat', {y: 0.48, back: false}], ['pad', {w: 0.36, h: 0.6, d: 0.08, y: 0.95, z: 0.2, stem: 0.62}]], feet: SEATFEET, ep: [1, 0.2, -0.3], view: [200, 14],
   A: {...SIT(), hv: [0.12, 0, 1], hr: 0.56}, B: {...SIT(), hv: [1, 0, 0.04], hr: 0.56}};
 export const POSES = P;
