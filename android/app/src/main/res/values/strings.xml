@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">My Trainer</string>
+    <string name="rest_channel">Rest timer</string>
+    <string name="rest_done">Rest finished</string>
+    <string name="rest_go">Time for your set</string>
 </resources>

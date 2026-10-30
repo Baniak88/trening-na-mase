@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mój Trener</string>
+    <string name="rest_channel">Przerwa między seriami</string>
+    <string name="rest_done">Koniec przerwy</string>
+    <string name="rest_go">Czas na serię</string>
 </resources>

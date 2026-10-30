@@ -871,3 +871,5 @@ select,.field input,.pe-in{background:var(--sunk);border-radius:10px}
 /* 2.7: plan editor actions */
 .pe-acts{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px}
 .pe-acts .danger-link{margin-left:auto}
+.chip.rest-go{border:0;color:inherit;cursor:pointer;min-height:32px}
+.chip.rest-go:active{background:var(--accent-soft);color:var(--accent)}

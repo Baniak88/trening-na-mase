@@ -1,9 +1,11 @@
 package io.github.baniak88.trening;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -29,17 +31,21 @@ import java.nio.charset.StandardCharsets;
  * Hosts the web app from the APK's assets in a WebView.
  * Assets are served from https://appassets.androidplatform.net so ES modules
  * and localStorage work like on a normal website. A small JS bridge
- * ("TnmAndroid") adds saving files, vibration and keeping the screen on.
+ * ("TnmAndroid") adds saving files, vibration, keeping the screen on and
+ * the rest alarm that rings while the app is in the background.
  */
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String START = "https://" + HOST + "/assets/www/index.html";
     private static final int REQ_PICK = 1;
     private static final int REQ_SAVE = 2;
+    private static final int REQ_NOTIFY = 3;
 
     private WebView web;
     private ValueCallback<Uri[]> pickCallback;
     private String pendingSave;
+    private volatile long restAt;
+    private boolean askedNotify;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -104,7 +110,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         if (web != null) web.evaluateJavascript("window.tnmSave && window.tnmSave()", null);
+        if (restAt > System.currentTimeMillis() + 1000) RestAlarm.schedule(this, restAt);
         super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        RestAlarm.cancel(this);
     }
 
     @Override
@@ -174,6 +187,23 @@ public class MainActivity extends Activity {
             if (v == null || !v.hasVibrator()) return;
             if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
             else v.vibrate(ms);
+        }
+
+        /** End of the running rest as epoch milliseconds ("0" = no rest). */
+        @JavascriptInterface
+        public void restAt(String at) {
+            long t;
+            try {
+                t = Long.parseLong(at);
+            } catch (NumberFormatException e) {
+                t = 0;
+            }
+            restAt = t;
+            if (t > 0 && !askedNotify && Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                askedNotify = true;
+                runOnUiThread(() -> requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFY));
+            }
         }
     }
 }

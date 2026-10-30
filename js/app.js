@@ -196,31 +196,47 @@ function discard() { S.draft = null; persistNow(); stopRest(); releaseWake(); re
 const volume = w => w.ex.reduce((a, q) => a + (isS(EX[q.id] || {}) ? 0 : q.sets.reduce((b, s) => b + (s.kg || 0) * (s.reps || 0), 0)), 0);
 
 /* ---------- Rest timer, sound, wake lock ---------- */
-const T = {end: 0, total: 0, on: false, goT: null}; let actx = null;
+const T = {end: 0, total: 0, on: false, goT: null, cue: 0}; let actx = null;
 function unlockAudio() { try { if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); } if (actx && actx.state === 'suspended') actx.resume(); } catch (err) { /* no audio */ } }
+function tone(at, hz, len, vol) { const os = actx.createOscillator(), g = actx.createGain(); os.frequency.value = hz; g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + len); os.connect(g).connect(actx.destination); os.start(at); os.stop(at + len + 0.03); }
+/** Short tick for the last seconds of a rest. */
+function pip() {
+  if (S.settings.restSound !== false) try { if (actx) tone(actx.currentTime, 660, 0.09, 0.2); } catch (err) { /* no audio */ }
+  try { if (ANDROID) ANDROID.vibrate(60); else if (navigator.vibrate) navigator.vibrate(60); } catch (err) { /* no vibration */ }
+}
 function beep() {
-  try { if (!actx) return; const t = actx.currentTime; [0, 0.28, 0.56].forEach((o, i) => { const os = actx.createOscillator(), g = actx.createGain(); os.frequency.value = i === 2 ? 1175 : 880; g.gain.setValueAtTime(0.0001, t + o); g.gain.exponentialRampToValueAtTime(0.35, t + o + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + o + 0.22); os.connect(g).connect(actx.destination); os.start(t + o); os.stop(t + o + 0.25); }); } catch (err) { /* no audio */ }
+  if (S.settings.restSound !== false) try { if (actx) { const t = actx.currentTime; [0, 0.28, 0.56].forEach((o, i) => tone(t + o, i === 2 ? 1175 : 880, 0.22, 0.35)); } } catch (err) { /* no audio */ }
   try { if (ANDROID) ANDROID.vibrate(500); else if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (err) { /* no vibration */ }
 }
-function startRest(sec, next) { T.total = sec; T.end = Date.now() + sec * 1000; T.on = true; clearTimeout(T.goT); $('#rest').classList.remove('go'); $('#restLbl').textContent = 'Przerwa'; $('#restNext').textContent = next || ''; $('#restNext').hidden = !next; $('#rest').hidden = false; tick(); }
-function stopRest() { T.on = false; clearTimeout(T.goT); $('#rest').hidden = true; $('#rest').classList.remove('go'); }
+/** Tell the Android app when the rest ends, so it can ring while the app is in the background (0 = no rest). */
+function restAlarm(at) { try { if (ANDROID && ANDROID.restAt) ANDROID.restAt(String(at)); } catch (err) { /* older app */ } }
+/** The running rest lives in the draft, so it survives closing and reopening the app. */
+function keepRest() { restAlarm(T.on ? T.end : 0); if (!S.draft) return; S.draft.rest = T.on ? {end: T.end, total: T.total, next: $('#restNext').textContent} : null; persistSoon(); }
+function showRest(next) { clearTimeout(T.goT); T.cue = 0; $('#rest').classList.remove('go'); $('#restLbl').textContent = 'Przerwa'; $('#restNext').textContent = next || ''; $('#restNext').hidden = !next; $('#rest').hidden = false; tick(); }
+function startRest(sec, next) { T.total = sec; T.end = Date.now() + sec * 1000; T.on = true; showRest(next); keepRest(); }
+function stopRest() { const was = T.on; T.on = false; clearTimeout(T.goT); $('#rest').hidden = true; $('#rest').classList.remove('go'); if (was || (S.draft && S.draft.rest)) keepRest(); }
+function resumeRest() { const r = S.draft && S.draft.rest; if (!r || T.on) return; if (r.end > Date.now()) { T.total = r.total; T.end = r.end; T.on = true; showRest(r.next); restAlarm(r.end); } else { S.draft.rest = null; restAlarm(0); } }
 function tick() {
   if (T.on) {
     const left = (T.end - Date.now()) / 1000;
-    if (left <= 0) { T.on = false; beep(); $('#rest').classList.add('go'); $('#restLbl').textContent = 'Koniec przerwy'; $('#restTm').textContent = 'Czas na serię'; $('#restPb').style.width = '100%'; T.goT = setTimeout(stopRest, 6000); }
-    else { $('#restTm').textContent = mmss(left); $('#restPb').style.width = (100 - left / T.total * 100) + '%'; }
+    if (left <= 0) { T.on = false; keepRest(); if (left > -5) beep(); $('#rest').classList.add('go'); $('#restLbl').textContent = 'Koniec przerwy'; $('#restTm').textContent = 'Czas na serię'; $('#restPb').style.width = '100%'; T.goT = setTimeout(stopRest, 6000); }
+    else {
+      const c = Math.ceil(left); if (c <= 3 && c !== T.cue && T.total > 5) { T.cue = c; pip(); }
+      $('#restTm').textContent = mmss(left); $('#restPb').style.width = (100 - left / T.total * 100) + '%';
+    }
   }
   if (S.draft) { const sec = (Date.now() - new Date(S.draft.started)) / 1000; const el = sec > 12 * 3600 ? (isEn() ? 'since ' : 'od ') + dateStr(S.draft.started) : hms(sec); const c = $('#elapsed'); if (c) c.textContent = el; const bt = $('#bnTime'); if (bt) bt.textContent = el; }
 }
 setInterval(tick, 250);
-$('#restMinus').onclick = () => { T.end -= 15000; tick(); };
-$('#restPlus').onclick = () => { T.end += 15000; T.total += 15; tick(); };
+resumeRest();
+$('#restMinus').onclick = () => { if (!T.on) return; T.end -= 15000; T.cue = 0; tick(); keepRest(); };
+$('#restPlus').onclick = () => { if (!T.on) return; T.end += 15000; T.total += 15; T.cue = 0; tick(); keepRest(); };
 $('#restSkip').onclick = stopRest;
 $('#restNext').onclick = () => { if (UI.tab !== 'train' && S.draft) { UI.tab = 'train'; UI.sub = null; render(); window.scrollTo(0, 0); } };
 let wl = null;
 async function wake() { if (ANDROID) { try { ANDROID.keepScreenOn(true); } catch (err) { /* ignore */ } return; } try { if (navigator.wakeLock && !wl) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } } catch (err) { wl = null; } }
 function releaseWake() { if (ANDROID) { try { ANDROID.keepScreenOn(false); } catch (err) { /* ignore */ } return; } try { wl && wl.release(); } catch (err) { /* already released */ } wl = null; }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (S.draft) wake(); tick(); if (!S.draft && UI.tab === 'train' && S.today && S.today.key !== todayKey()) render(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (S.draft) { wake(); resumeRest(); } tick(); if (!S.draft && UI.tab === 'train' && S.today && S.today.key !== todayKey()) render(); } });
 function nextLabel() {
   const d = S.draft;
   for (let i = 0; i < d.ex.length; i++) { const q = d.ex[i]; const k = q.sets.findIndex(s => !s.done); if (k >= 0) { const ex = EX[q.id]; return 'Następnie: ' + ex.n + ' · seria ' + (k + 1) + ' · ' + (q.sets[k].kg == null ? '' : kgTxt(ex, q.sets[k].kg) + ' × ') + repTxt(ex, q.sets[k].reps ?? q.lo); } }
@@ -681,7 +697,7 @@ function viewSession() {
   if (!d.genWu) h += '<section class="card wu"><div class="row" style="justify-content:space-between;flex-wrap:nowrap"><div><b>Rozgrzewka · 5–10 min</b>' + (UI.wuOpen ? '' : '<div class="muted small">Cardio, krążenia, kilka lekkich serii</div>') + '</div><div class="row" style="flex-wrap:nowrap"><button class="btn sm ghost" data-act="wu-toggle" aria-expanded="' + UI.wuOpen + '">' + (UI.wuOpen ? 'Zwiń' : 'Pokaż') + '</button><button class="btn sm ok" data-act="wu-done">Zrobione</button></div></div>' +
     (UI.wuOpen ? '<ul><li>3–5 min lekkiego cardio: rower, orbitrek, szybki marsz</li><li>Krążenia ramion i bioder, wymachy nóg po 10</li><li>10 przysiadów i 10 pompek bez obciążenia</li><li>Przed ciężkim ćwiczeniem zrób serie rozgrzewkowe pokazane przy nim</li></ul>' : '') + '</section>';
   h += '<section class="player" id="player"><div class="pl-head"><button class="pl-count" data-act="list" aria-haspopup="dialog">Ćwiczenie ' + (i + 1) + ' z ' + n + ' ▾</button><button class="btn sm ghost" data-act="tech" data-i="' + i + '">Zamień</button></div>' +
-    '<h2 class="pl-name">' + ex.n + '</h2><div class="row"><span class="chip">' + q.sets.length + ' × ' + range(ex, q) + '</span><span class="chip">przerwa ' + mmss(q.rest) + '</span><span class="chip m">' + KINDN[ex.kind] + '</span>' + (ex.uni ? '<span class="chip m">na stronę</span>' : '') + '</div>' +
+    '<h2 class="pl-name">' + ex.n + '</h2><div class="row"><span class="chip">' + q.sets.length + ' × ' + range(ex, q) + '</span><button class="chip rest-go" data-act="rest-go" data-i="' + i + '" aria-label="Włącz przerwę">⏱ <span>przerwa ' + mmss(q.rest) + '</span></button><span class="chip m">' + KINDN[ex.kind] + '</span>' + (ex.uni ? '<span class="chip m">na stronę</span>' : '') + '</div>' +
     '<button class="inl-wrap" data-act="tech" data-i="' + i + '" aria-label="Pokaż technikę: ' + ex.n + '">' + '<span class="inl photos' + (ex.ek ? ' ill' : '') + (REDUCED ? ' still' : '') + '"><img class="ph0" src="' + (ex.ek ? illSrc(ex, 0) : photoSrc(ex, 0)) + '" alt=""><img class="ph1" src="' + (ex.ek ? illSrc(ex, 1) : photoSrc(ex, 1)) + '" alt=""></span>' + '<span class="inl-cap"><b>Technika i opis ›</b></span></button>' +
     '<p class="hint' + (q.up ? ' up' : q.dl ? ' dl' : '') + '">' + (q.up ? '<span class="mono">↑</span>' : '') + '<span>' + q.hint + '</span></p>';
   if (ex.kind === 'bar' && !q.dl) { const rp = ramp(q.sets[0].kg); if (rp.length) h += '<div class="ramp"><span class="eyebrow">Rozgrzewka:</span>' + rp.map((r, j) => '<button data-act="wu" data-i="' + i + '" data-j="' + j + '" aria-pressed="' + !!(q.wu || [])[j] + '">' + fmt(r[0]) + '×' + r[1] + '</button>').join('') + '</div>'; }
@@ -824,6 +840,9 @@ function viewSettings() {
     '<p class="muted small">Wysiłek rośnie z tygodnia na tydzień, co 6. tydzień jest lżejszy.</p><button class="btn sm" data-act="cycle-reset">Zacznij cykl od tego tygodnia</button></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t" data-noi18n>Język · Language</div><div class="seg" style="grid-template-columns:repeat(3,1fr)" role="group" aria-label="Język">' + [['auto', 'Automatycznie'], ['pl', 'Polski'], ['en', 'English']].map(([k, l]) => '<button data-act="set-lang" data-v="' + k + '" aria-pressed="' + ((st.lang || 'auto') === k) + '"' + (k !== 'auto' ? ' data-noi18n' : '') + '>' + l + '</button>').join('') + '</div><p class="muted small">Język aplikacji. Automatycznie: polski na telefonach po polsku, angielski na pozostałych.</p></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Wygląd</div><div class="seg" style="grid-template-columns:repeat(3,1fr)" role="group" aria-label="Motyw">' + [['navy', 'Granatowy'], ['light', 'Jasny'], ['system', 'Jak telefon']].map(([k, l]) => '<button data-act="set-theme" data-v="' + k + '" aria-pressed="' + ((st.theme || 'navy') === k) + '">' + l + '</button>').join('') + '</div></section>';
+  h += '<section class="card stack" style="gap:10px"><div class="sec-t">Przerwa między seriami</div><div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Start przerwy"><button data-act="set-rest-auto" data-v="1" aria-pressed="' + (st.restAuto !== false) + '">Sama po serii</button><button data-act="set-rest-auto" data-v="0" aria-pressed="' + (st.restAuto === false) + '">Ręcznie</button></div>' +
+    '<div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Sygnał końca przerwy"><button data-act="set-rest-sound" data-v="1" aria-pressed="' + (st.restSound !== false) + '">Dźwięk i wibracja</button><button data-act="set-rest-sound" data-v="0" aria-pressed="' + (st.restSound === false) + '">Tylko wibracja</button></div>' +
+    '<p class="muted small">Odliczanie rusza po odhaczeniu serii, a długość bierze z planu. Ręcznie włączysz ją przyciskiem ⏱ przy ćwiczeniu. Ostatnie 3 sekundy pikają, a koniec przerwy daje sygnał. W aplikacji na Androida przyjdzie też powiadomienie, gdy telefon jest zablokowany.</p></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Gryf</div><div class="seg" style="grid-template-columns:repeat(3,1fr)">' + [20, 15, 10].map(b => '<button data-act="set-bar" data-v="' + b + '" aria-pressed="' + (st.bar === b) + '">' + b + ' kg</button>').join('') + '</div><p class="muted small">Do kalkulatora talerzy przy ćwiczeniach ze sztangą.</p></section>';
   h += '<section class="card stack" style="gap:10px"><div class="sec-t">Twoje dane</div><p class="muted small">Treningi zapisują się tylko w tym telefonie (' + S.workouts.length + ' treningów). Zrób kopię, żeby przenieść je na inne urządzenie.</p>' +
     '<div class="row"><button class="btn sm" data-act="export">Zapisz kopię (plik)</button><label class="btn sm ghost filebtn">Wczytaj kopię<input type="file" id="importFile" accept="application/json,.json" hidden></label></div>' +
@@ -1076,6 +1095,8 @@ function onAct(ev) {
     case 'cfg': UI.cfgOpen = !UI.cfgOpen; render(); break;
     case 'set-profile': setting('profile', v); render(); toast('Siłownia: ' + profile().name); break;
     case 'set-dur': setting('duration', +v); render(); break;
+    case 'set-rest-auto': setting('restAuto', v === '1'); render(); break;
+    case 'set-rest-sound': unlockAudio(); setting('restSound', v === '1'); if (v === '1') beep(); render(); break;
     case 'set-focus': setting('focus', v); render(); break;
     case 'set-day': setting('next', +v); render(); break;
     case 'set-mode': setting('mode', v); render(); break;
@@ -1157,12 +1178,13 @@ function onAct(ev) {
       if (s.kg == null && ex.kind !== 'bw') { const el = document.getElementById('kg-' + i); if (el) { el.classList.add('need'); el.focus(); } toast('Wpisz ciężar'); return; }
       if (s.kg == null) s.kg = 0; if (s.reps == null) s.reps = q.lo; s.done = true; UI.sel = null;
       const finishedEx = exDone(q); const [c, t] = counts(d);
-      if (c < t) startRest(finishedEx ? Math.max(90, q.rest) : q.rest, nextLabel()); else stopRest();
+      if (c < t && S.settings.restAuto !== false) startRest(finishedEx ? Math.max(90, q.rest) : q.rest, nextLabel()); else stopRest();
       persistNow();
       if (c >= t) { render(); openPanel('finish', {mode: 'finish'}); break; }
       if (finishedEx) { const j = nextUndone(i); if (j >= 0) { toast('Następne: ' + EX[d.ex[j].id].n); goEx(j); break; } }
       render(); break;
     }
+    case 'rest-go': unlockAudio(); startRest(d.ex[i].rest, nextLabel()); break;
     case 'undo': { const q = d.ex[i]; q.sets[activeSet(i)].done = false; persistSoon(); render(); break; }
     case 'addset': { const q = d.ex[i]; const l = q.sets[q.sets.length - 1]; q.sets.push({kg: l.kg, reps: l.reps, done: false}); UI.sel = {i, k: q.sets.length - 1}; persistSoon(); render(); break; }
     case 'rmset': { const q = d.ex[i]; if (q.sets.length > 1 && !q.sets[q.sets.length - 1].done) q.sets.pop(); UI.sel = null; persistSoon(); render(); break; }
