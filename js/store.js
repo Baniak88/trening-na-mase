@@ -18,6 +18,7 @@ export function defaultState() {
     settings: {
       mode: 'auto', plan: 'fbw3', next: 0, profile: 'gym', duration: 60, focus: 'auto',
       bar: 20, bw: 80, subs: {}, exclude: [], cycleStart: null, welcomed: false, updatedAt: 0, dayPick: null, theme: 'navy', lang: 'auto',
+      restAuto: true, restSound: true,
     },
     profiles: defaultProfiles(),
     customPlans: [],
@@ -68,6 +69,7 @@ export function migrate(d) {
     for (const k of ['mode', 'plan', 'next', 'profile', 'duration', 'focus', 'bar', 'bw', 'cycleStart', 'welcomed', 'updatedAt', 'theme', 'lang']) if (o[k] != null) s.settings[k] = o[k];
     if (o.subs && typeof o.subs === 'object') s.settings.subs = {...o.subs};
     if (Array.isArray(o.exclude)) s.settings.exclude = o.exclude.filter(id => EX[id]);
+    for (const k of ['restAuto', 'restSound']) if (typeof o[k] === 'boolean') s.settings[k] = o[k];
     if (o.plan === 'fbw') s.settings.plan = 'fbw3';
     if (o.plan === 'ul') s.settings.plan = 'ul4';
   }
@@ -85,6 +87,7 @@ export function migrate(d) {
   if (Array.isArray(d.workouts)) s.workouts = d.workouts.filter(validWorkout);
   if (o0(d.settings).dayPick && typeof d.settings.dayPick === 'object') s.settings.dayPick = {stamp: String(d.settings.dayPick.stamp), idx: +d.settings.dayPick.idx || 0};
   if (d.draft && Array.isArray(d.draft.ex)) s.draft = d.draft;
+  if (s.draft && s.draft.rest && !(Number.isFinite(s.draft.rest.end) && s.draft.rest.total > 0)) s.draft.rest = null;
   if (d.today && Array.isArray(d.today.items)) s.today = d.today;
   // AI coach: provider settings (the key never leaves this phone, it is not in backups) and the last messages.
   if (d.ai && typeof d.ai === 'object') for (const k of ['provider', 'key', 'model', 'base']) if (typeof d.ai[k] === 'string') s.ai[k] = d.ai[k].slice(0, 400);

@@ -1,5 +1,14 @@
 /* English interface texts: Polish phrase -> English. Patterns use {0}, {1}... for numbers in the same order. */
 export const EN={
+"Włącz przerwę": "Start rest",
+"Przerwa między seriami": "Rest between sets",
+"Start przerwy": "Rest start",
+"Sama po serii": "After each set",
+"Ręcznie": "Manually",
+"Sygnał końca przerwy": "End of rest signal",
+"Dźwięk i wibracja": "Sound and vibration",
+"Tylko wibracja": "Vibration only",
+"Odliczanie rusza po odhaczeniu serii, a długość bierze z planu. Ręcznie włączysz ją przyciskiem ⏱ przy ćwiczeniu. Ostatnie 3 sekundy pikają, a koniec przerwy daje sygnał. W aplikacji na Androida przyjdzie też powiadomienie, gdy telefon jest zablokowany.": "The countdown starts when you tick off a set and takes its length from the plan. Start it manually with the ⏱ button next to the exercise. The last 3 seconds beep and the end of rest gives a signal. The Android app also sends a notification when the phone is locked.",
 "Serie mniej": "Fewer sets",
 "Serie więcej": "More sets",
 "Powtórzenia od mniej": "Lower minimum reps",

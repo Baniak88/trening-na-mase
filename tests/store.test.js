@@ -79,3 +79,11 @@ test('weekly plans keep weekdays and muscles', () => {
   assert.deepEqual(s.settings.dayPick, {stamp: '2026-10-12', idx: 1});
   assert.equal(cleanPlan({days: [{name: 'A', ex: []}]}).week, undefined, 'old plans stay sequential');
 });
+
+test('rest timer settings and a running rest survive migration', () => {
+  const s = migrate({settings: {restAuto: false, restSound: 'x'}, draft: {ex: [], started: '2026-01-01', rest: {end: 1e12, total: 90, next: ''}}});
+  assert.equal(s.settings.restAuto, false);
+  assert.equal(s.settings.restSound, true);
+  assert.equal(s.draft.rest.total, 90);
+  assert.equal(migrate({draft: {ex: [], rest: {end: 'soon'}}}).draft.rest, null);
+});
